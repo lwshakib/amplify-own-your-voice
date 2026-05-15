@@ -1,0 +1,19 @@
+# Build artifacts
+.next
+dist
+build
+out
+.turbo
+
+# Dependencies
+node_modules
+bun.lock
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Project-specific ignores
+.gemini
+public/
+prisma/generated/

@@ -1,0 +1,309 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// 1-4. User & Auth Tables
+model User {
+  id            String    @id
+  name          String
+  email         String
+  emailVerified Boolean   @default(false)
+  image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  sessions      Session[]
+  accounts      Account[]
+  interviews    Interview[]
+  debates       Debate[]
+  aiPersonas    AiPersona[]
+  interactions  AgentInteraction[]
+  marketplaceItems MarketplaceItem[]
+  marketplaceRatings MarketplaceRating[]
+  marketplaceReviews MarketplaceReview[]
+
+  @@unique([email])
+  @@map("user")
+}
+
+model Session {
+  id        String   @id
+  expiresAt DateTime
+  token     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([token])
+  @@index([userId])
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([userId])
+  @@map("account")
+}
+
+model Verification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+  @@map("verification")
+}
+
+// 5. Enums
+enum InterviewType {
+  TECHNICAL
+  GENERAL
+}
+
+enum InteractionType {
+  INTERVIEW
+  DEBATE
+  AI_PERSONA
+}
+
+enum InteractionStatus {
+  IN_PROGRESS
+  COMPLETED
+}
+
+enum MarketplaceItemType {
+  INTERVIEW
+  DEBATE
+  AI_PERSONA
+}
+
+// 6-8. Core Feature Tables
+model Interview {
+  id                String             @id @default(cuid())
+  jobTitle          String
+  description       String             @db.Text
+  type              InterviewType      @default(TECHNICAL)
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  userId            String
+  user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  characterId       String?            // Selected interviewer
+  interactions      AgentInteraction[]
+
+  installedFromId   String?
+  installedFrom     MarketplaceItem? @relation(fields: [installedFromId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@map("interview")
+}
+
+model Debate {
+  id                String             @id @default(cuid())
+  subject           String             // "This house believes..."
+  content           String?            @db.Text // Extra info/context
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  userId            String
+  user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  judgeId           String?            // Selected judge character
+  opponentId        String?            // Selected opponent character/team lead (primary)
+  opponentIds       Json?              // Selected additional/all opponent characters
+  interactions      AgentInteraction[]
+
+  installedFromId   String?
+  installedFrom     MarketplaceItem? @relation(fields: [installedFromId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@map("debate")
+}
+
+model AiPersona {
+  id          String   @id @default(cuid())
+  name        String
+  instruction String   @db.Text
+  characterId String?
+  avatar      Json?
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  interactions AgentInteraction[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  installedFromId String?
+  installedFrom   MarketplaceItem? @relation(fields: [installedFromId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@map("ai_persona")
+}
+
+// 9-10. Session & Interaction Tables
+model AgentInteraction {
+  id              String           @id @default(cuid())
+  userId          String
+  user            User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type            InteractionType
+  status          InteractionStatus @default(IN_PROGRESS)
+  
+  // Relations to parents
+  interviewId     String?
+  interview       Interview?        @relation(fields: [interviewId], references: [id], onDelete: Cascade)
+  debateId        String?
+  debate          Debate?           @relation(fields: [debateId], references: [id], onDelete: Cascade)
+  aiPersonaId     String?
+  aiPersona       AiPersona?        @relation(fields: [aiPersonaId], references: [id], onDelete: Cascade)
+  
+  // Debate specific
+  userSide        String?  // "PRO" (Affirmative) or "CON" (Negative)
+  
+  messages        Message[]
+  duration        Int              @default(0)
+  
+  metrics         MessageMetric?
+
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  @@index([userId])
+  @@index([interviewId])
+  @@index([debateId])
+  @@index([aiPersonaId])
+  @@map("agent_interaction")
+}
+
+model Message {
+  id               String           @id @default(cuid())
+  role             String           // "user" or "assistant"
+  /**
+   * Array of message parts.
+   * Part types:
+   * - { 
+   *     type: 'text', 
+   *     text: string, 
+   *     speakerName?: string, 
+   *     speakerTitle?: string, 
+   *     isUsersTurn?: boolean, 
+   *     audio?: { path: string | null } 
+   *   }
+   * - { type: 'tool', name: string, parameters: object } // Use name: 'open_editor' for code submissions
+   */
+  parts            Json
+  feedback         String?          @db.Text
+  
+  metrics          MessageMetric?
+
+  interactionId    String?
+  interaction      AgentInteraction? @relation(fields: [interactionId], references: [id], onDelete: Cascade)
+  
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  @@index([interactionId])
+  @@map("message")
+}
+
+model MessageMetric {
+  id               String   @id @default(cuid())
+  
+  messageId        String?  @unique
+  message          Message?  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  interactionId    String?  @unique
+  interaction      AgentInteraction? @relation(fields: [interactionId], references: [id], onDelete: Cascade)
+
+  correctness      Int?
+  clarity          Int?
+  relevance        Int?
+  detail           Int?
+  efficiency       Int?
+  creativity       Int?
+  communication    Int?
+  problemSolving   Int?
+
+  @@map("message_metric")
+}
+
+// 11. Marketplace Tables
+model MarketplaceItem {
+  id          String   @id @default(cuid())
+  name        String
+  description String   @db.Text
+  type        MarketplaceItemType
+  content     Json     // Stores the specific configuration
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Tracking if this item came from a specific user creation to prevent duplicate publishing
+  originalInterviewId   String?
+  originalDebateId      String?
+  originalAiPersonaId   String?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  ratings     MarketplaceRating[]
+  reviews     MarketplaceReview[]
+
+  // Installed items
+  installedInterviews  Interview[]
+  installedDebates     Debate[]
+  installedPersonas    AiPersona[]
+
+  @@index([userId])
+  @@map("marketplace_item")
+}
+
+model MarketplaceRating {
+  id                String          @id @default(cuid())
+  value             Int             // 1-5
+  userId            String
+  user              User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  marketplaceItemId String
+  marketplaceItem   MarketplaceItem @relation(fields: [marketplaceItemId], references: [id], onDelete: Cascade)
+  createdAt         DateTime        @default(now())
+
+  @@unique([userId, marketplaceItemId])
+  @@map("marketplace_rating")
+}
+
+model MarketplaceReview {
+  id                String          @id @default(cuid())
+  content           String          @db.Text
+  userId            String
+  user              User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  marketplaceItemId String
+  marketplaceItem   MarketplaceItem @relation(fields: [marketplaceItemId], references: [id], onDelete: Cascade)
+  createdAt         DateTime        @default(now())
+
+  @@unique([userId, marketplaceItemId])
+  @@map("marketplace_review")
+}
