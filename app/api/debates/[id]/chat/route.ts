@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { s3Service } from "@/services/s3.services"
+import { getSignedDownloadUrl } from "@/lib/s3"
 import prisma from "@/lib/prisma"
 import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
@@ -383,7 +383,7 @@ You MUST respond with a valid JSON object matching the following structure. NO m
     let signedUrl = null
     try {
       audioData = await aiService.textToSpeech(responseData.text, speakerModel)
-      signedUrl = await s3Service.getSignedDownloadUrl(audioData.path)
+      signedUrl = await getSignedDownloadUrl(audioData.path)
     } catch (err) {
       console.error("TTS Error in Debate API:", err)
     }
