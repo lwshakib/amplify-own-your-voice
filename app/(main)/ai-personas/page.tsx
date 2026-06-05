@@ -44,7 +44,7 @@ interface CustomAgent {
   name: string
   instruction: string
   characterId: string | null // Maps to a voice/avatar configuration in @/lib/characters
-  avatar: { url: string; publicId: string } | null
+  avatar: { url: string; path: string } | null
   createdAt: string
   installedFromId: string | null // Present if this agent was cloned from the marketplace
   installedFrom?: {

@@ -37,7 +37,7 @@ interface CustomAgent {
   name: string
   instruction: string
   characterId: string | null
-  avatar: { url: string; publicId: string } | null
+  avatar: { url: string; path: string } | null
   createdAt: string
   interactions: { id: string }[]
 }
