@@ -3,7 +3,7 @@ import { validateSession } from "@/lib/auth-utils"
 import { NextResponse } from "next/server"
 import { CoachStreamSchema } from "@/schemas/coach"
 
-import { getFeatureLogic } from "@/features/registry"
+import { getFeatureLogic } from "@/lib/features-registry"
 
 export async function POST(req: Request) {
   try {

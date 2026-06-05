@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
 
     const isTechnical = type?.toUpperCase() === "TECHNICAL"
     const { getJobDescriptionSystemPrompt, getJobDescriptionUserPrompt } =
-      await import("@/features/interview/prompts")
+      await import("@/lib/interview/prompts")
 
     const messages = [
       { role: "system", content: getJobDescriptionSystemPrompt() },

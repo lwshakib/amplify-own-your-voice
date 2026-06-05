@@ -4,7 +4,7 @@ import { Prisma } from "@/generated/prisma/client"
 import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
 import { UpdateMessageSchema } from "@/schemas/chat"
-import { MessagePart } from "@/features/types"
+import { MessagePart } from "@/types/features"
 
 export async function PATCH(
   req: NextRequest,

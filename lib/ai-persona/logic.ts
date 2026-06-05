@@ -1,6 +1,6 @@
 import { getAiPersonaPrompt } from "./prompts"
 import { getCharacter } from "@/lib/characters"
-import { AgentInteraction, CoachParams, FeatureLogic } from "../types"
+import { AgentInteraction, CoachParams, FeatureLogic } from "@/types/features"
 
 export const ai_persona_logic: FeatureLogic = {
   getPrompt: (interaction: AgentInteraction) => {

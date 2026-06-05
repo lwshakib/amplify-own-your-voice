@@ -1,6 +1,6 @@
 import { getInterviewPrompt } from "./prompts"
 import { getCharacter } from "@/lib/characters"
-import { AgentInteraction, AuthUser, CoachParams, FeatureLogic } from "../types"
+import { AgentInteraction, AuthUser, CoachParams, FeatureLogic } from "@/types/features"
 
 export const interview_logic: FeatureLogic = {
   getPrompt: (interaction: AgentInteraction, user: AuthUser) => {

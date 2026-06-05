@@ -16,7 +16,7 @@ export async function POST(req: Request) {
 
     const { prompt } = validation.data
 
-    const { getDebateMotionPrompt } = await import("@/features/debate/prompts")
+    const { getDebateMotionPrompt } = await import("@/lib/debate/prompts")
     const messages = [
       {
         role: "system",

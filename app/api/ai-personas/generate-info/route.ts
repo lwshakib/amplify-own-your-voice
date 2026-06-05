@@ -32,7 +32,7 @@ export async function POST(req: Request) {
 
   try {
     const { getPersonaBuilderPrompt } =
-      await import("@/features/ai_persona/builder-prompts")
+      await import("@/lib/ai-persona/builder-prompts")
     const systemPrompt = getPersonaBuilderPrompt(isRefining, {
       name: existingName,
       instructions: existingInstructions,

@@ -5,7 +5,7 @@ import {
   Message,
   CoachParams,
   FeatureLogic,
-} from "../types"
+} from "@/types/features"
 import { getCharacter, CHARACTERS } from "@/lib/characters"
 
 export const debate_logic: FeatureLogic = {

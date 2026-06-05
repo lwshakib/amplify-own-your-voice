@@ -31,7 +31,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { AgentInteraction, AuthUser, Message, MessagePart } from "../types"
+import { AgentInteraction, AuthUser, Message, MessagePart } from "@/types/features"
 
 interface DebateSessionProps {
   id: string
@@ -208,7 +208,7 @@ export default function DebateSession({
   )
 
   const fetchAiResponse = useCallback(
-    async (history: Message[], audioUrl?: string, audioPublicId?: string) => {
+    async (history: Message[], audioUrl?: string, audioPath?: string) => {
       try {
         if (chatAbortControllerRef.current)
           chatAbortControllerRef.current.abort()
@@ -221,7 +221,7 @@ export default function DebateSession({
             messages: history,
             duration: timerRef.current,
             audioUrl,
-            audioPublicId,
+            audioPath,
           }),
           signal: chatAbortControllerRef.current.signal,
         })
@@ -238,7 +238,7 @@ export default function DebateSession({
           text: textPart?.text || "",
           status: data.status,
           audioUrl: textPart?.audio?.url,
-          audioPublicId: textPart?.audio?.publicId,
+          audioPath: textPart?.audio?.path,
           speakerName: textPart?.speakerName || "Agent",
           speakerTitle: textPart?.speakerTitle || "Moderator",
           isUsersTurn: textPart?.isUsersTurn ?? false,
@@ -860,7 +860,7 @@ export default function DebateSession({
         const audioBlob = await audioPromise
         try {
           const { uploadToS3Client } = await import("@/lib/s3-client")
-          const path = await uploadToS3Client(audioBlob, "user-recordings")
+          const path = await uploadToS3Client(audioBlob, "audio")
 
           // Get a signed URL for immediate playback
           const res = await fetch(
@@ -931,7 +931,7 @@ export default function DebateSession({
         async ([aiData, uploadResult]) => {
           const result = uploadResult as {
             url: string | null
-            publicId: string | null
+            path: string | null
           } | null
           if (aiData?.userMessageId && result?.url) {
             try {

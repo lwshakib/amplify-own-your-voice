@@ -7,7 +7,7 @@ import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
 import { aiService } from "@/services/ai.services"
 import { AiResponseSchema } from "@/schemas/chat"
-import { getAiPersonaPrompt } from "@/features/ai_persona/prompts"
+import { getAiPersonaPrompt } from "@/lib/ai-persona/prompts"
 
 export async function POST(
   req: NextRequest,

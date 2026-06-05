@@ -2,7 +2,6 @@
 
 import { useEffect, useState, useRef, useCallback } from "react"
 import { useRouter } from "next/navigation"
-import Image from "next/image"
 import {
   IconMicrophone,
   IconMicrophoneOff,
@@ -13,18 +12,17 @@ import {
   IconPlayerPause,
   IconVolume,
   IconVolumeOff,
-  IconRobot,
   IconCode,
   IconTerminal,
   IconSun,
   IconMoon,
   IconSparkles,
+  IconLoader2,
   IconInfoCircle,
   IconMessages,
-  IconLoader2,
 } from "@tabler/icons-react"
-import { toast } from "sonner"
 import { useTheme } from "next-themes"
+import { toast } from "sonner"
 
 import CodeMirror from "@uiw/react-codemirror"
 import { javascript } from "@codemirror/lang-javascript"
@@ -35,8 +33,8 @@ import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { motion, AnimatePresence } from "framer-motion"
 import { cn } from "@/lib/utils"
+import { type Character, getCharacter } from "@/lib/characters"
 import ReactMarkdown from "react-markdown"
-// import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import {
   Dialog,
   DialogContent,
@@ -44,90 +42,31 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { AgentInteraction, AuthUser, Message, MessagePart } from "@/types/features"
 
-interface MessagePart {
-  type: string
-  text?: string
-  name?: string
-  parameters?: Record<string, unknown>
-  speakerName?: string
-  speakerTitle?: string
-  isUsersTurn?: boolean
-  audio?: { url: string | null; path?: string | null; publicId?: string | null }
-}
-
-interface Message {
-  role: "user" | "assistant"
-  parts: string | MessagePart[]
-  status?: string
-  audioUrl?: string
-  toolCalls?: Record<string, unknown>[]
-  id?: string
-}
-
-interface SpeechRecognition extends EventTarget {
-  continuous: boolean
-  interimResults: boolean
-  lang: string
-  onstart: () => void
-  onend: () => void
-  onresult: (event: SpeechRecognitionEvent) => void
-  start: () => void
-  stop: () => void
-}
-
-interface SpeechRecognitionEvent {
-  resultIndex: number
-  results: {
-    length: number
-    [key: number]: {
-      isFinal: boolean
-      length: number
-      [key: number]: {
-        transcript: string
-      }
-    }
-  }
-}
-
-interface AiPersonaSessionProps {
+interface InterviewSessionProps {
   id: string
-  session: {
-    type: string
-    status: string
+  session: AgentInteraction & {
     messages: Message[]
-    duration?: number
-    aiPersona?: {
-      name: string
-      instruction: string
-      characterId?: string
-      avatar?: { url: string; publicId: string }
-      avatarUrl?: string
-    }
+    duration: number
+    status: string
   }
-  authSession: {
-    user: {
-      id: string
-      name?: string | null
-      email?: string | null
-      image?: string | null
-    }
-  } | null
+  authSession: { user: AuthUser } | null
 }
 
-export default function AiPersonaSession({
+export default function InterviewSession({
   id,
   session: initialSession,
   authSession,
-}: AiPersonaSessionProps) {
+}: InterviewSessionProps) {
   const router = useRouter()
-  const { theme, setTheme } = useTheme()
   const [session, setSession] = useState(initialSession)
   const [messages, setMessages] = useState<Message[]>(
     initialSession.messages || [],
   )
-  const [persona, setPersona] = useState<Character | undefined>(undefined)
-  const [timer, setTimer] = useState(initialSession.duration || 0)
+  const [interviewer, setInterviewer] = useState<Character | undefined>(
+    undefined,
+  )
   const [isRecording, setIsRecording] = useState(false)
   const transcriptRef = useRef("")
   const [isThinking, setIsThinking] = useState(
@@ -139,28 +78,6 @@ export default function AiPersonaSession({
   const [isAiStreaming, setIsAiStreaming] = useState(false)
   const [showAiSuggestion, setShowAiSuggestion] = useState(false)
   const [streamedText, setStreamedText] = useState("")
-  const [liveTranscript, setLiveTranscript] = useState("")
-  const [isMuted, setIsMuted] = useState(false)
-  const [isPaused, setIsPaused] = useState(false)
-  const [recognition, setRecognition] = useState<SpeechRecognition | null>(null)
-  const [audio, setAudio] = useState<HTMLAudioElement | null>(null)
-  const audioRef = useRef<HTMLAudioElement | null>(null)
-  const abortControllerRef = useRef<AbortController | null>(null)
-  const isMutedRef = useRef(false)
-  const isPausedRef = useRef(false)
-  const isInitialized = useRef(false)
-
-  const fluxWsRef = useRef<WebSocket | null>(null)
-  const audioContextRef = useRef<AudioContext | null>(null)
-  const processorRef = useRef<ScriptProcessorNode | null>(null)
-  const [isGeneratingSolution, setIsGeneratingSolution] = useState(false)
-  const micStreamRef = useRef<MediaStream | null>(null)
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
-  const audioChunksRef = useRef<Blob[]>([])
-  const lastPartialRef = useRef("")
-  const solutionAbortControllerRef = useRef<AbortController | null>(null)
-
-  // Coding State
   const [codingChallenge, setCodingChallenge] = useState<{
     title: string
     description: string
@@ -169,12 +86,37 @@ export default function AiPersonaSession({
   } | null>(null)
   const [isCodingModalOpen, setIsCodingModalOpen] = useState(false)
   const [currentCode, setCurrentCode] = useState("")
+  const [timer, setTimer] = useState(initialSession.duration || 0)
+  const timerRef = useRef(timer)
+  const { theme, setTheme } = useTheme()
+  const [liveTranscript, setLiveTranscript] = useState("")
+  const [isConnecting, setIsConnecting] = useState(false)
+  const [isMuted, setIsMuted] = useState(false)
+  const [isPaused, setIsPaused] = useState(false)
 
   // Modal State for generic messages
   const [isHistoryOpen, setIsHistoryOpen] = useState(false)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [modalTitle, setModalTitle] = useState("")
   const [modalContent, setModalContent] = useState("")
+
+  const isInitialized = useRef(false)
+  const abortControllerRef = useRef<AbortController | null>(null)
+  const audioRef = useRef<HTMLAudioElement | null>(null)
+  const isMutedRef = useRef(false)
+  const isPausedRef = useRef(false)
+  const [audio, setAudio] = useState<HTMLAudioElement | null>(null)
+
+  const fluxWsRef = useRef<WebSocket | null>(null)
+  const audioContextRef = useRef<AudioContext | null>(null)
+  const processorRef = useRef<ScriptProcessorNode | null>(null)
+  const [isGeneratingSolution, setIsGeneratingSolution] = useState(false)
+  const micStreamRef = useRef<MediaStream | null>(null)
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+  const audioChunksRef = useRef<Blob[]>([])
+  const connectionAttemptRef = useRef<number>(0)
+  const lastPartialRef = useRef("")
+  const solutionAbortControllerRef = useRef<AbortController | null>(null)
 
   const fetchAsrToken = useCallback(async () => {
     try {
@@ -189,6 +131,7 @@ export default function AiPersonaSession({
   }, [])
 
   const stopFluxAsr = useCallback(() => {
+    setIsConnecting(false)
     if (processorRef.current) {
       processorRef.current.disconnect()
       processorRef.current = null
@@ -213,14 +156,355 @@ export default function AiPersonaSession({
     }
   }, [])
 
-  const startFluxAsr = useCallback(async () => {
+  const stopAll = useCallback(() => {
+    if (abortControllerRef.current) abortControllerRef.current.abort()
+    if (audioRef.current) {
+      audioRef.current.pause()
+      audioRef.current.src = ""
+    }
+    stopFluxAsr()
+    setIsRecording(false)
+    setIsAiTalking(false)
+    setIsThinking(false)
+    setIsUserTalking(false)
+    setIsAiStreaming(false)
+  }, [stopFluxAsr])
+
+  const handleExit = useCallback(
+    (path: string) => {
+      stopAll()
+      router.push(path)
+    },
+    [stopAll, router],
+  )
+
+  const handleToolCalls = useCallback((toolCalls: MessagePart[]) => {
+    toolCalls.forEach((tc: MessagePart) => {
+      const name = tc.name || tc.tool?.name
+      const parameters = (tc.parameters || tc.tool?.parameters) as Record<
+        string,
+        unknown
+      >
+
+      if (name === "openCodeEditor") {
+        const params = parameters as {
+          title?: string
+          description?: string
+          code?: string
+          language?: "javascript" | "python" | "cpp"
+        }
+        setCodingChallenge({
+          title: params.title || "Code Challenge",
+          description: params.description || "",
+          initialCode: params.code || "",
+          language: params.language || "javascript",
+        })
+        setCurrentCode(params.code || "")
+        setIsCodingModalOpen(true)
+      } else if (name === "openModal") {
+        const params = parameters as { title?: string; content?: string }
+        setModalTitle(params.title || "Notification")
+        setModalContent(params.content || "Please see the instructions below.")
+        setIsModalOpen(true)
+      }
+    })
+  }, [])
+
+  const handleAiSolution = async () => {
+    if (!codingChallenge) return
+
+    if (isGeneratingSolution) {
+      if (solutionAbortControllerRef.current) {
+        solutionAbortControllerRef.current.abort()
+      }
+      setIsGeneratingSolution(false)
+      return
+    }
+
+    setIsGeneratingSolution(true)
+    solutionAbortControllerRef.current = new AbortController()
+
+    try {
+      const res = await fetch("/api/ai/solution", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: codingChallenge.title,
+          description: codingChallenge.description,
+          language: codingChallenge.language,
+          currentCode,
+        }),
+        signal: solutionAbortControllerRef.current.signal,
+      })
+      if (!res.ok) throw new Error("Failed to generate solution")
+      const result = await res.json()
+      if (result.solution) {
+        setCurrentCode(result.solution)
+        toast.success("Solution generated and applied.")
+      }
+    } catch (err) {
+      if ((err as Error).name === "AbortError") {
+        console.log("Solution generation aborted")
+        return
+      }
+      console.error("AI solution error:", err)
+      toast.error("Could not generate solution.")
+    } finally {
+      setIsGeneratingSolution(false)
+    }
+  }
+
+  const fetchAiResponse = useCallback(
+    async (
+      history: Message[],
+      code?: string,
+      audioUrl?: string,
+      audioPath?: string,
+    ) => {
+      try {
+        if (abortControllerRef.current) abortControllerRef.current.abort()
+        abortControllerRef.current = new AbortController()
+
+        const response = await fetch(`/api/sessions/${id}/chat`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            messages: history,
+            code,
+            duration: timerRef.current,
+            audioUrl,
+            audioPath,
+          }),
+          signal: abortControllerRef.current.signal,
+        })
+        if (!response.ok) throw new Error("Failed to fetch AI response")
+        const data = await response.json()
+        const toolCalls =
+          data.parts?.filter((p: MessagePart) => p.type === "tool") || []
+        if (toolCalls.length > 0) {
+          handleToolCalls(toolCalls)
+        }
+
+        if (data.status === "COMPLETED" || data.status === "Completed") {
+          setSession((prev) => (prev ? { ...prev, status: "COMPLETED" } : prev))
+        }
+
+        const textPart = data.parts?.find((p: MessagePart) => p.type === "text")
+
+        return {
+          text: textPart?.text || "",
+          isCompleted:
+            data.status === "COMPLETED" || data.status === "Completed",
+          audioUrl: textPart?.audio?.url,
+          audioPath: textPart?.audio?.path,
+          speakerName: textPart?.speakerName || "Agent",
+          speakerTitle: textPart?.speakerTitle || "Interviewer",
+          isUsersTurn: textPart?.isUsersTurn ?? true,
+          toolCalls: toolCalls as MessagePart[],
+          userMsgId: data.userMessageId,
+        }
+      } catch (error: unknown) {
+        if (error instanceof Error && error.name === "AbortError")
+          return "AbortError"
+        console.error("AI Error:", error)
+        return null
+      }
+    },
+    [id, handleToolCalls],
+  )
+
+  const speak = useCallback(
+    async (
+      text: string,
+      isCompleted: boolean = false,
+      audioUrl?: string,
+      setTurnAtEnd: boolean = true,
+    ) => {
+      if (audio) {
+        audio.pause()
+        audio.src = ""
+      }
+
+      try {
+        setIsThinking(true)
+        if (!audioUrl) return
+        const url = audioUrl
+        const newAudio = new Audio(url)
+
+        newAudio.onplay = () => {
+          setIsAiTalking(true)
+          setIsThinking(false)
+        }
+
+        newAudio.onended = () => {
+          setIsAiTalking(false)
+          setIsThinking(false)
+          if (setTurnAtEnd) setIsUsersTurn(true)
+          if (!audioUrl && url) URL.revokeObjectURL(url)
+
+          if (isCompleted) {
+            handleExit(`/sessions/${id}`)
+          }
+        }
+
+        audioRef.current = newAudio
+        setAudio(newAudio)
+        newAudio.play().catch((err) => {
+          if (err.name === "AbortError") return
+          console.error("Play error:", err)
+          setIsAiTalking(false)
+          setIsThinking(false)
+        })
+      } catch (error) {
+        console.error("Speech error:", error)
+        setIsAiTalking(false)
+        setIsThinking(false)
+      }
+    },
+    [audio, id, handleExit],
+  )
+
+  // Timer Effect
+  useEffect(() => {
+    let interval: NodeJS.Timeout
+    if (session?.status !== "COMPLETED") {
+      interval = setInterval(() => {
+        setTimer((prev) => {
+          const next = prev + 1
+          timerRef.current = next
+          return next
+        })
+      }, 1000)
+    }
+    return () => clearInterval(interval)
+  }, [session?.status])
+
+  // Sync refs with state
+  useEffect(() => {
+    isMutedRef.current = isMuted
+    isPausedRef.current = isPaused
+  }, [isMuted, isPaused])
+
+  // Initial Logic
+  useEffect(() => {
+    if (isInitialized.current && messages.length > 0) return
+
+    const charId = session.interview?.characterId || "sarah"
+    setInterviewer(getCharacter(charId))
+
+    if (messages.length > 0) {
+      isInitialized.current = true
+      const lastMsg = messages[messages.length - 1]
+      setIsUsersTurn(lastMsg.role === "assistant") // Default assumption if history exists
+      if (lastMsg.role === "assistant") {
+        const textPart = Array.isArray(lastMsg.parts)
+          ? (lastMsg.parts as MessagePart[]).find((p) => p.type === "text")
+          : null
+        const audioUrl =
+          textPart?.audio?.url ||
+          (lastMsg as Message & { audioUrl?: string }).audioUrl
+
+        const toolCalls = Array.isArray(lastMsg.parts)
+          ? (lastMsg.parts as MessagePart[]).filter((p) => p.type === "tool")
+          : []
+
+        if (toolCalls.length > 0) {
+          handleToolCalls(toolCalls)
+        }
+
+        const textToSpeak =
+          textPart?.text ||
+          (typeof lastMsg.parts === "string" ? lastMsg.parts : "")
+
+        speak(
+          textToSpeak,
+          lastMsg.status === "COMPLETED" || lastMsg.status === "Completed",
+          audioUrl,
+        )
+      }
+    } else {
+      // AI Starts first if no history
+      const startInteraction = async () => {
+        setIsThinking(true)
+        const aiResponse = await fetchAiResponse([])
+
+        // If aborted, don't do anything as a second request is likely coming
+        if (aiResponse === "AbortError") return
+
+        if (aiResponse && typeof aiResponse !== "string") {
+          isInitialized.current = true
+          const assistantMsg: Message = {
+            role: "assistant",
+            parts: [
+              {
+                type: "text" as const,
+                text: aiResponse.text,
+                speakerName: aiResponse.speakerName,
+                speakerTitle: aiResponse.speakerTitle,
+                isUsersTurn: !!aiResponse.isUsersTurn,
+                audio: {
+                  path: aiResponse.audioPath,
+                  url: aiResponse.audioUrl || null,
+                },
+              },
+              ...(aiResponse.toolCalls
+                ? (aiResponse.toolCalls as MessagePart[]).map(
+                    (tc: MessagePart) => ({
+                      type: "tool" as const,
+                      name: (tc.name || tc.tool?.name || "") as string,
+                      parameters: (tc.parameters ||
+                        tc.tool?.parameters ||
+                        {}) as Record<string, unknown>,
+                    }),
+                  )
+                : []),
+            ],
+          }
+          setMessages([assistantMsg])
+          setIsUsersTurn(!!aiResponse.isUsersTurn)
+          speak(
+            aiResponse.text,
+            aiResponse.isCompleted,
+            aiResponse.audioUrl,
+            !!aiResponse.isUsersTurn,
+          )
+        } else {
+          setIsThinking(false)
+          setIsUsersTurn(true)
+        }
+      }
+      startInteraction()
+    }
+  }, [
+    messages.length,
+    fetchAiResponse,
+    speak,
+    session.interview?.characterId,
+    handleToolCalls,
+    messages,
+  ])
+
+  const stopAndCancel = () => {
+    connectionAttemptRef.current = 0
+    setIsRecording(false)
+    stopFluxAsr()
+  }
+
+  const startFluxAsr = async () => {
+    const currentAttempt = connectionAttemptRef.current
     const token = await fetchAsrToken()
-    if (!token) return
+
+    if (connectionAttemptRef.current !== currentAttempt) return
+
+    if (!token) {
+      setIsConnecting(false)
+      return
+    }
 
     const workerUrl = `${process.env.NEXT_PUBLIC_FLUX_WORKER_URL || "wss://flux.leadwithshakib.workers.dev/"}?token=${token}`
 
     try {
-      micStreamRef.current = await navigator.mediaDevices.getUserMedia({
+      const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           sampleRate: 16000,
           channelCount: 1,
@@ -228,9 +512,21 @@ export default function AiPersonaSession({
         },
       })
 
+      if (connectionAttemptRef.current !== currentAttempt) {
+        stream.getTracks().forEach((t) => t.stop())
+        return
+      }
+
+      micStreamRef.current = stream
       fluxWsRef.current = new WebSocket(workerUrl)
 
       fluxWsRef.current.onopen = () => {
+        if (connectionAttemptRef.current !== currentAttempt) {
+          fluxWsRef.current?.close()
+          return
+        }
+        setIsConnecting(false)
+        setIsRecording(true)
         const audioContext = new (
           window.AudioContext ||
           (window as unknown as { webkitAudioContext: typeof AudioContext })
@@ -244,7 +540,8 @@ export default function AiPersonaSession({
         const processor = audioContext.createScriptProcessor(4096, 1, 1)
         processorRef.current = processor
 
-        processor.onaudioprocess = (e) => {
+        processor.onaudioprocess = (e: { inputBuffer: AudioBuffer }) => {
+          // Strictly check for Muted or Paused states
           if (
             fluxWsRef.current?.readyState === WebSocket.OPEN &&
             !isMutedRef.current &&
@@ -262,6 +559,7 @@ export default function AiPersonaSession({
         source.connect(processor)
         processor.connect(audioContext.destination)
 
+        // Standard MediaRecorder for high quality audio file upload
         const mediaRecorder = new MediaRecorder(micStreamRef.current!)
         mediaRecorderRef.current = mediaRecorder
         audioChunksRef.current = []
@@ -271,13 +569,16 @@ export default function AiPersonaSession({
         mediaRecorder.start()
       }
 
-      fluxWsRef.current.onmessage = (e: MessageEvent) => {
+      fluxWsRef.current.onmessage = (e: { data: string }) => {
         if (isPausedRef.current) return
         try {
           const data = JSON.parse(e.data)
           if (data.transcript) {
             const clean = data.transcript.trim()
             if (clean) {
+              // Heuristic: If current transcript is shorter than what we saw,
+              // the worker might have reset for a new utterance without is_final: true.
+              // We should commit the previous partial to the ref.
               if (
                 lastPartialRef.current &&
                 data.transcript.length < lastPartialRef.current.length * 0.7 &&
@@ -316,399 +617,92 @@ export default function AiPersonaSession({
         }
       }
 
-      fluxWsRef.current.onerror = (err: Event) =>
+      fluxWsRef.current.onerror = (err) => {
         console.error("ASR WS Error:", err)
+        stopFluxAsr()
+        setIsRecording(false)
+      }
       fluxWsRef.current.onclose = () => stopFluxAsr()
     } catch (e) {
       console.error("Mic Access Error:", e)
-    }
-  }, [fetchAsrToken, stopFluxAsr])
-
-  const handleToolCalls = useCallback(
-    (
-      toolCalls: (
-        | MessagePart
-        | { tool: { name: string; parameters: Record<string, unknown> } }
-      )[],
-    ) => {
-      toolCalls.forEach((tc) => {
-        const name =
-          "type" in tc && tc.type === "tool"
-            ? tc.name
-            : "tool" in tc
-              ? tc.tool.name
-              : undefined
-        const parameters =
-          "type" in tc && tc.type === "tool"
-            ? tc.parameters
-            : "tool" in tc
-              ? tc.tool.parameters
-              : undefined
-
-        if (name === "openCodeEditor" && parameters) {
-          setCodingChallenge({
-            title: (parameters.title as string) || "Code Challenge",
-            description: (parameters.description as string) || "",
-            initialCode: (parameters.code as string) || "",
-            language:
-              (parameters.language as "javascript" | "python" | "cpp") ||
-              "javascript",
-          })
-          setCurrentCode((parameters.code as string) || "")
-          setIsCodingModalOpen(true)
-        } else if (name === "openModal" && parameters) {
-          setModalTitle((parameters.title as string) || "Notification")
-          setModalContent(
-            (parameters.content as string) ||
-              "Please see the instructions below.",
-          )
-          setIsModalOpen(true)
-        }
-      })
-    },
-    [],
-  )
-
-  const handleAiSolution = async () => {
-    if (!codingChallenge) return
-
-    if (isGeneratingSolution) {
-      if (solutionAbortControllerRef.current) {
-        solutionAbortControllerRef.current.abort()
-      }
-      setIsGeneratingSolution(false)
-      return
-    }
-
-    setIsGeneratingSolution(true)
-    solutionAbortControllerRef.current = new AbortController()
-
-    try {
-      const res = await fetch("/api/ai/solution", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: codingChallenge.title,
-          description: codingChallenge.description,
-          language: codingChallenge.language,
-          currentCode,
-        }),
-        signal: solutionAbortControllerRef.current.signal,
-      })
-      if (!res.ok) throw new Error("Failed to generate solution")
-      const result = await res.json()
-      if (result.solution) {
-        setCurrentCode(result.solution)
-        toast.success("Solution generated and applied.")
-      }
-    } catch (err: unknown) {
-      if ((err as Error).name === "AbortError") {
-        console.log("Solution generation aborted")
-        return
-      }
-      console.error("AI solution error:", err)
-      toast.error("Could not generate solution.")
-    } finally {
-      setIsGeneratingSolution(false)
+      setIsConnecting(false)
+      setIsRecording(false)
     }
   }
 
-  const fetchAiResponse = useCallback(
-    async (
-      history: Message[],
-      extras?: { code?: string },
-      audioUrl?: string,
-      audioPublicId?: string,
-    ) => {
-      try {
-        if (abortControllerRef.current) abortControllerRef.current.abort()
-        abortControllerRef.current = new AbortController()
+  const startRecording = () => {
+    const attempt = Date.now()
+    connectionAttemptRef.current = attempt
+    setIsConnecting(true)
+    transcriptRef.current = ""
+    lastPartialRef.current = ""
+    setLiveTranscript("")
+    startFluxAsr()
+  }
 
-        const res = await fetch(`/api/sessions/${id}/chat`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            messages: history,
-            duration: timer,
-            audioUrl,
-            audioPath,
-            ...extras,
-          }),
-          signal: abortControllerRef.current.signal,
+  const stopAndSubmit = async () => {
+    setIsRecording(false)
+
+    // Start upload in parallel
+    const audioUploadPromise = (async () => {
+      if (
+        mediaRecorderRef.current &&
+        mediaRecorderRef.current.state !== "inactive"
+      ) {
+        const audioPromise = new Promise<Blob>((resolve) => {
+          mediaRecorderRef.current!.onstop = () => {
+            const blob = new Blob(audioChunksRef.current, {
+              type: "audio/webm",
+            })
+            resolve(blob)
+          }
         })
-        if (!res.ok) throw new Error("API Error")
-        const data = await res.json()
+        mediaRecorderRef.current.stop()
+        const audioBlob = await audioPromise
 
-        const toolCalls =
-          data.parts?.filter((p: MessagePart) => p.type === "tool") || []
-        if (toolCalls.length > 0) {
-          handleToolCalls(toolCalls)
-        }
+        try {
+          const { uploadToS3Client } = await import("@/lib/s3-client")
+          const path = await uploadToS3Client(audioBlob, "audio")
 
-        if (data.status === "COMPLETED" || data.status === "Completed") {
-          setSession((prev: AiPersonaSessionProps["session"]) =>
-            prev ? { ...prev, status: "COMPLETED" } : prev,
+          // Optionally get a temporary signed URL
+          const res = await fetch(
+            `/api/s3/signed-url?path=${encodeURIComponent(path)}`,
           )
+          const { url } = await res.json()
+
+          return { url, path } // Updated return type
+        } catch (err) {
+          console.error("Failed to upload user audio to S3:", err)
+          return null
         }
-
-        const textPart = data.parts?.find((p: MessagePart) => p.type === "text")
-
-        return {
-          text: textPart?.text || "",
-          isCompleted:
-            data.status === "COMPLETED" || data.status === "Completed",
-          audioUrl: textPart?.audio?.url,
-          audioPath: textPart?.audio?.path,
-          speakerName: textPart?.speakerName || "Agent",
-          isUsersTurn: textPart?.isUsersTurn ?? true,
-          toolCalls: toolCalls as MessagePart[],
-          userMessageId: data.userMessageId,
-        }
-      } catch (e: unknown) {
-        if ((e as Error).name === "AbortError") return "AbortError"
-        console.error(e)
-        return null
       }
-    },
-    [id, timer, handleToolCalls],
-  )
-
-  const stopAll = useCallback(() => {
-    if (abortControllerRef.current) abortControllerRef.current.abort()
-    if (audioRef.current) {
-      audioRef.current.pause()
-      audioRef.current.src = ""
-    }
-    recognition?.stop()
-    stopFluxAsr()
-    setIsRecording(false)
-    setIsAiTalking(false)
-    setIsThinking(false)
-    setIsUserTalking(false)
-    setIsAiStreaming(false)
-    setShowAiSuggestion(false)
-  }, [recognition, stopFluxAsr])
-
-  const handleExit = useCallback(
-    (path: string) => {
-      stopAll()
-      router.push(path)
-    },
-    [router, stopAll],
-  )
-
-  const speak = useCallback(
-    async (
-      text: string,
-      isCompleted: boolean = false,
-      audioUrl?: string,
-      setTurnAtEnd: boolean = true,
-    ) => {
-      if (audio) {
-        audio.pause()
-        audio.src = ""
-      }
-
-      try {
-        setIsThinking(true)
-        if (!audioUrl) return
-        const url = audioUrl
-        const newAudio = new Audio(url)
-
-        newAudio.onplay = () => {
-          setIsAiTalking(true)
-          setIsThinking(false)
-        }
-
-        newAudio.onended = () => {
-          setIsAiTalking(false)
-          setIsThinking(false)
-          if (setTurnAtEnd) setIsUsersTurn(true)
-          if (!audioUrl && url) URL.revokeObjectURL(url)
-          if (isCompleted) handleExit(`/ai-personas`)
-        }
-
-        audioRef.current = newAudio
-        setAudio(newAudio)
-        newAudio.play().catch((e) => {
-          if (e.name === "AbortError") return
-          setIsAiTalking(false)
-          setIsThinking(false)
-        })
-      } catch (e) {
-        console.error(e)
-        setIsAiTalking(false)
-        setIsThinking(false)
-      }
-    },
-    [audio, handleExit],
-  )
-
-  const handleSend = useCallback(
-    async (
-      text: string,
-      extras?: { code?: string },
-      audioUrl?: string,
-      audioPath?: string,
-    ) => {
-      const userMsg: Message = {
-        role: "user",
-        parts: [
-          {
-            type: "text",
-            text,
-            speakerName: authSession?.user?.name || "You",
-            speakerTitle: "Candidate",
-            isUsersTurn: false,
-            audio: { url: audioUrl || null, path: audioPath || null },
-          },
-          ...(extras?.code
-            ? [
-                {
-                  type: "tool",
-                  text: "Open Editor",
-                  parameters: { code: extras.code },
-                } as MessagePart,
-              ]
-            : []),
-        ],
-      }
-
-      setMessages((prev: Message[]) => {
-        const newMessages = [...prev, userMsg]
-
-        // We still need to call fetchAiResponse with the new history
-        fetchAiResponse(newMessages, extras, audioUrl, audioPath).then(
-          (aiData) => {
-            if (aiData === "AbortError" || !aiData) {
-              setIsThinking(false)
-              setIsUsersTurn(true)
-              return
-            }
-
-            const assistantMsg: Message = {
-              role: "assistant",
-              parts: [
-                {
-                  type: "text",
-                  text: aiData.text,
-                  speakerName: aiData.speakerName,
-                  speakerTitle: "Interviewer",
-                  isUsersTurn: !!aiData.isUsersTurn,
-                  audio: {
-                    path: aiData.audioPath,
-                    url: aiData.audioUrl || null,
-                  },
-                },
-                ...(aiData.toolCalls
-                  ? (
-                      aiData.toolCalls as {
-                        name: string
-                        parameters: Record<string, unknown>
-                      }[]
-                    ).map((tc) => ({ type: "tool" as const, tool: tc }))
-                  : []),
-              ],
-            }
-            setMessages((curr) => [...curr, assistantMsg])
-            setIsUsersTurn(!!aiData.isUsersTurn)
-            speak(
-              aiData.text,
-              aiData.isCompleted,
-              aiData.audioUrl,
-              !!aiData.isUsersTurn,
-            )
-          },
-        )
-
-        return newMessages
-      })
-
-      setShowAiSuggestion(false)
-      setStreamedText("")
-      setIsThinking(true)
-    },
-    [authSession?.user?.name, fetchAiResponse, speak],
-  )
-
-  const stopAndSubmit = useCallback(async () => {
-    const final = (transcriptRef.current + " " + (lastPartialRef.current || ""))
-      .replace(/\s+/g, " ")
-      .trim()
-    setIsRecording(false)
-    recognition?.stop()
-
-    let userAudioUrl: string | undefined = undefined
-    let userAudioPath: string | undefined = undefined
-
-    if (
-      mediaRecorderRef.current &&
-      mediaRecorderRef.current.state !== "inactive"
-    ) {
-      const audioPromise = new Promise<Blob>((resolve) => {
-        mediaRecorderRef.current!.onstop = () => {
-          const blob = new Blob(audioChunksRef.current, { type: "audio/webm" })
-          resolve(blob)
-        }
-      })
-      mediaRecorderRef.current.stop()
-      const audioBlob = await audioPromise
-
-      try {
-        const { uploadToS3Client } = await import("@/lib/s3-client")
-        const path = await uploadToS3Client(audioBlob, "user-recordings")
-        userAudioPath = path
-
-        // Optionally get a temporary signed URL for immediate preview/playback if needed by the UI
-        const res = await fetch(
-          `/api/s3/signed-url?path=${encodeURIComponent(path)}`,
-        )
-        const { url } = await res.json()
-        userAudioUrl = url
-      } catch (err) {
-        console.error("Failed to upload user audio to S3:", err)
-      }
-    }
+      return null
+    })()
 
     stopFluxAsr()
     setIsMuted(false)
     setIsPaused(false)
 
-    if (final) handleSend(final, undefined, userAudioUrl, userAudioPath)
-    transcriptRef.current = ""
-    lastPartialRef.current = ""
-    setLiveTranscript("")
-  }, [recognition, handleSend, stopFluxAsr])
+    // Capture the final string from the display buffer
+    const finalTranscriptText = (
+      transcriptRef.current +
+      " " +
+      (lastPartialRef.current || "")
+    )
+      .replace(/\s+/g, " ")
+      .trim()
 
-  const startRecording = useCallback(() => {
-    transcriptRef.current = ""
-    lastPartialRef.current = ""
-    setLiveTranscript("")
-    setIsRecording(true)
-    startFluxAsr()
-    try {
-      recognition?.start()
-    } catch {
-      /* ignore */
+    if (finalTranscriptText) {
+      handleUserResponse(finalTranscriptText, undefined, audioUploadPromise)
     }
-  }, [recognition, startFluxAsr])
-
-  const toggleRecording = useCallback(() => {
-    if (isRecording) stopAndSubmit()
-    else startRecording()
-  }, [isRecording, stopAndSubmit, startRecording])
-
-  const handleCancelSuggestion = () => {
-    if (abortControllerRef.current) abortControllerRef.current.abort()
-    setIsAiStreaming(false)
-    setShowAiSuggestion(false)
-    setStreamedText("")
+    transcriptRef.current = ""
+    lastPartialRef.current = ""
+    setLiveTranscript("")
   }
 
-  const handleOpenMicFromSuggestion = () => {
-    if (abortControllerRef.current) abortControllerRef.current.abort()
-    setIsAiStreaming(false)
-    startRecording()
+  const toggleRecording = () => {
+    if (isRecording) stopAndSubmit()
+    else startRecording()
   }
 
   const handleGenerateWithAi = async () => {
@@ -727,11 +721,15 @@ export default function AiPersonaSession({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          messages: messages.slice(-10),
-          candidateName: authSession?.user?.name,
-          interviewerName: session?.aiPersona?.name || persona?.firstName,
-          sessionType: "ai-persona",
-          personaInstructions: session?.aiPersona?.instruction,
+          messages: messages,
+          candidateName: user?.name,
+          interviewerName: interviewer
+            ? `${interviewer.firstName} ${interviewer.lastName}`
+            : "Sarah Miller",
+          interviewType: session?.interview?.type,
+          jobTitle: session?.interview?.jobTitle,
+          jobDescription: session?.interview?.description,
+          sessionType: "interview",
         }),
         signal: currentAbortController.signal,
       })
@@ -750,176 +748,146 @@ export default function AiPersonaSession({
           accumulated += chunk
           setStreamedText(accumulated)
         }
-
-        // Removed: if (!isCancelled && accumulated) { handleSend(accumulated) }
       }
     } catch (error: unknown) {
-      if ((error as { name?: string }).name === "AbortError") {
-        // Ignored
+      if (error instanceof Error && error.name !== "AbortError") {
+        console.error("Streaming error:", error)
       }
     } finally {
       setIsAiStreaming(false)
     }
   }
 
-  // Initialize Speech Recognition
-  useEffect(() => {
-    const win = window as unknown as {
-      SpeechRecognition?: new () => SpeechRecognition
-      webkitSpeechRecognition?: new () => SpeechRecognition
+  const handleCancelSuggestion = () => {
+    if (abortControllerRef.current) abortControllerRef.current.abort()
+    setIsAiStreaming(false)
+    setShowAiSuggestion(false)
+    setStreamedText("")
+  }
+
+  const handleOpenMicFromSuggestion = () => {
+    if (abortControllerRef.current) abortControllerRef.current.abort()
+    setIsAiStreaming(false)
+    startRecording()
+  }
+
+  const handleUserResponse = async (
+    text: string,
+    code?: string,
+    audioUploadPromise?: Promise<{
+      url: string | null
+      path: string | null
+    } | null>,
+  ) => {
+    const userMsg: Message = {
+      role: "user",
+      parts: [
+        {
+          type: "text" as const,
+          text,
+          speakerName: authSession?.user?.name || "Candidate",
+          speakerTitle: "Candidate",
+          isUsersTurn: false,
+          audio: { url: null, path: null },
+        },
+        ...(code
+          ? ([
+              {
+                type: "tool" as const,
+                name: "open_editor",
+                parameters: { code },
+              },
+            ] as MessagePart[])
+          : []),
+      ],
     }
-    const SpeechRecognitionVar =
-      win.SpeechRecognition || win.webkitSpeechRecognition
-    if (SpeechRecognitionVar) {
-      const rec = new (SpeechRecognitionVar as { new (): SpeechRecognition })()
-      rec.continuous = true
-      rec.interimResults = true
-      rec.lang = "en-US"
+    const newMessages: Message[] = [...messages, userMsg]
+    setMessages(newMessages)
+    setShowAiSuggestion(false)
+    setStreamedText("")
 
-      rec.onstart = () => setIsUserTalking(true)
-      rec.onend = () => setIsUserTalking(false)
-      rec.onresult = (event: SpeechRecognitionEvent) => {
-        let interim = ""
-        let final = ""
-        for (let i = event.resultIndex; i < event.results.length; ++i) {
-          const trans = event.results[i][0].transcript
-          if (event.results[i].isFinal) final += trans
-          else interim += trans
-        }
-        if (final) transcriptRef.current += final + " "
-        setLiveTranscript(transcriptRef.current + interim)
-      }
-      setRecognition(rec)
-    }
-  }, [])
+    setIsThinking(true)
+    const aiData = await fetchAiResponse(newMessages, code)
+    if (aiData === "AbortError") return
 
-  // Timer
-  useEffect(() => {
-    let interval: NodeJS.Timeout
-    if (session?.status !== "COMPLETED") {
-      interval = setInterval(() => setTimer((prev: number) => prev + 1), 1000)
-    }
-    return () => clearInterval(interval)
-  }, [session?.status])
+    if (aiData) {
+      // Background: Handle audio update if promise exists
+      if (audioUploadPromise && aiData.userMsgId) {
+        audioUploadPromise.then(async (result) => {
+          if (result?.url) {
+            try {
+              await fetch(`/api/messages/${aiData.userMsgId}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  audioUrl: result.url,
+                  audioPath: result.path,
+                }),
+              })
 
-  // Sync refs with state
-  useEffect(() => {
-    isMutedRef.current = isMuted
-    isPausedRef.current = isPaused
-  }, [isMuted, isPaused])
-
-  // Initial Fetch
-  useEffect(() => {
-    if (isInitialized.current && messages.length > 0) return
-
-    const personaAvatar =
-      session.aiPersona?.avatar?.url || session.aiPersona?.avatarUrl
-
-    if (personaAvatar) {
-      setPersona({
-        avatar: personaAvatar,
-        firstName: session.aiPersona?.name || "",
-        lastName: "",
-        gender: "male",
-        model: "luna",
-        id: "custom",
-        audio: "",
-      })
-    } else if (session.aiPersona?.characterId) {
-      const char = getCharacter(session.aiPersona.characterId)
-      if (char) {
-        setPersona({
-          ...char,
-          firstName: session.aiPersona?.name || char.firstName,
+              // Locally update messages to show audio if needed
+              setMessages((prev) =>
+                prev.map((m) => {
+                  if (
+                    m.id === aiData.userMsgId ||
+                    (m.role === "user" && m.parts)
+                  ) {
+                    const updatedParts = m.parts.map((p) => {
+                      if (p.type === "text") {
+                        return {
+                          ...p,
+                          audio: { url: result.url, path: result.path },
+                        }
+                      }
+                      return p
+                    })
+                    return { ...m, parts: updatedParts }
+                  }
+                  return m
+                }),
+              )
+            } catch (err) {
+              console.error("Error updating message audio in background:", err)
+            }
+          }
         })
       }
-    }
 
-    if (messages.length > 0) {
-      isInitialized.current = true
-      const lastMsg = messages[messages.length - 1]
-      setIsUsersTurn(lastMsg.role === "assistant")
-      if (lastMsg.role === "assistant") {
-        const textPart = Array.isArray(lastMsg.parts)
-          ? lastMsg.parts.find((p: MessagePart) => p.type === "text")
-          : null
-        const audioUrl =
-          textPart?.audio?.url ||
-          (lastMsg as Message & { audioUrl?: string }).audioUrl
-
-        const toolCalls = Array.isArray(lastMsg.parts)
-          ? lastMsg.parts.filter((p: MessagePart) => p.type === "tool")
-          : []
-
-        if (toolCalls.length > 0) {
-          handleToolCalls(toolCalls as MessagePart[])
-        }
-
-        const textToSpeak =
-          textPart?.text ||
-          (typeof lastMsg.parts === "string" ? lastMsg.parts : "")
-
-        speak(
-          textToSpeak,
-          lastMsg.status === "COMPLETED" || lastMsg.status === "Completed",
-          audioUrl,
-          true,
-        )
+      const assistantMsg: Message = {
+        role: "assistant",
+        parts: [
+          {
+            type: "text" as const,
+            text: aiData.text,
+            speakerName: aiData.speakerName,
+            speakerTitle: aiData.speakerTitle,
+            isUsersTurn: !!aiData.isUsersTurn,
+            audio: { url: aiData.audioUrl, path: aiData.audioPath },
+          },
+          ...(aiData.toolCalls
+            ? aiData.toolCalls.map((tc: MessagePart) => ({
+                type: "tool" as const,
+                name: (tc.name || tc.tool?.name || "") as string,
+                parameters: (tc.parameters ||
+                  tc.tool?.parameters ||
+                  {}) as Record<string, unknown>,
+              }))
+            : []),
+        ],
       }
+      setMessages([...newMessages, assistantMsg])
+      setIsUsersTurn(!!aiData.isUsersTurn)
+      speak(
+        aiData.text,
+        aiData.isCompleted,
+        aiData.audioUrl,
+        !!aiData.isUsersTurn,
+      )
     } else {
-      const startInteraction = async () => {
-        setIsThinking(true)
-        const aiData = await fetchAiResponse([])
-
-        if (aiData === "AbortError") return
-
-        if (aiData) {
-          isInitialized.current = true
-          const aiMsg: Message = {
-            role: "assistant",
-            parts: [
-              {
-                type: "text",
-                text: aiData.text,
-                speakerName:
-                  aiData.speakerName || persona?.firstName || "Agent",
-                speakerTitle: "Interviewer",
-                isUsersTurn: !!aiData.isUsersTurn,
-                audio: { url: aiData.audioUrl, publicId: aiData.audioPublicId },
-              },
-              ...(aiData.toolCalls
-                ? (
-                    aiData.toolCalls as {
-                      name: string
-                      parameters: Record<string, unknown>
-                    }[]
-                  ).map((tc) => ({ type: "tool" as const, tool: tc }))
-                : []),
-            ],
-          }
-          setMessages([aiMsg])
-          setIsUsersTurn(!!aiData.isUsersTurn)
-          speak(
-            aiData.text,
-            aiData.isCompleted,
-            aiData.audioUrl,
-            !!aiData.isUsersTurn,
-          )
-        } else {
-          setIsThinking(false)
-          setIsUsersTurn(true)
-        }
-      }
-      startInteraction()
+      setIsThinking(false)
+      setIsUsersTurn(true) // Allow user to try again on error
     }
-  }, [
-    messages,
-    fetchAiResponse,
-    persona?.firstName,
-    session,
-    speak,
-    handleToolCalls,
-  ])
+  }
 
   useEffect(() => {
     return () => stopAll()
@@ -933,15 +901,20 @@ export default function AiPersonaSession({
       <div className="absolute top-0 inset-x-0 h-20 px-4 md:px-8 flex items-center justify-between z-50 bg-gradient-to-b from-background/80 to-transparent backdrop-blur-sm">
         <div className="flex items-center gap-2 md:gap-4 min-w-0">
           <button
-            onClick={() => handleExit(`/ai-personas`)}
+            onClick={() => handleExit(`/sessions/${id}`)}
             className="text-muted-foreground hover:text-foreground hover:bg-muted rounded-full p-2 transition-colors shrink-0"
           >
             <IconX size={20} />
           </button>
           <div className="hidden sm:block h-4 w-px bg-border mx-2 shrink-0" />
           <div className="min-w-0">
-            <h1 className="text-sm font-semibold truncate max-w-[150px] sm:max-w-none">
-              {session?.aiPersona?.name}
+            <h1 className="text-sm font-semibold flex items-center gap-2">
+              <span className="truncate max-w-[120px] sm:max-w-[250px] md:max-w-none">
+                {session?.interview?.jobTitle}
+              </span>
+              <span className="shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20 hidden xs:inline-block">
+                {session?.interview?.type}
+              </span>
             </h1>
           </div>
         </div>
@@ -953,7 +926,9 @@ export default function AiPersonaSession({
             onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
             className="rounded-full text-muted-foreground hover:text-foreground"
           >
-            {theme === "dark" ? <IconSun size={20} /> : <IconMoon size={20} />}
+            <IconSun className="h-[1.2rem] w-[1.2rem] rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+            <IconMoon className="absolute h-[1.2rem] w-[1.2rem] rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+            <span className="sr-only">Toggle theme</span>
           </Button>
 
           <Button
@@ -967,10 +942,9 @@ export default function AiPersonaSession({
               History
             </span>
           </Button>
-
           <Button
             className="bg-destructive/10 hover:bg-destructive/20 text-destructive border border-destructive/20 rounded-full gap-2 px-3 md:px-6 h-9 font-mono"
-            onClick={() => handleExit(`/ai-personas`)}
+            onClick={() => handleExit(`/sessions/${id}`)}
           >
             <IconPlayerStopFilled size={14} />
             <span className="text-xs md:text-sm font-bold tracking-tight">
@@ -1009,9 +983,6 @@ export default function AiPersonaSession({
         <div className="absolute top-1/2 right-1/4 -translate-y-1/2 w-[500px] h-[500px] bg-blue-500/5 rounded-full blur-[120px] pointer-events-none animate-pulse" />
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8 w-full max-w-6xl relative z-10">
-          <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-background to-transparent pointer-events-none" />
-
-          {/* User Side */}
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
@@ -1084,7 +1055,7 @@ export default function AiPersonaSession({
                           {user?.name || "You"}
                         </h3>
                         <p className="text-muted-foreground text-xs md:text-sm mt-1 font-bold">
-                          User
+                          Candidate
                         </p>
                       </div>
                     </>
@@ -1157,10 +1128,10 @@ export default function AiPersonaSession({
                               : handleOpenMicFromSuggestion
                           }
                           className={cn(
-                            "flex-1 h-11 rounded-xl text-white shadow-lg font-bold text-xs gap-2 shadow-xl transition-all duration-300",
+                            "flex-[2] h-11 rounded-xl text-white font-bold text-xs gap-2 transition-all duration-300",
                             isRecording
-                              ? "bg-red-500 hover:bg-red-600 border-red-400 shadow-red-500/20"
-                              : "bg-emerald-500 hover:bg-emerald-600 border-emerald-400 shadow-emerald-500/20",
+                              ? "bg-red-500 hover:bg-red-600 border-red-400"
+                              : "bg-emerald-600 hover:bg-emerald-700 border-emerald-500",
                           )}
                         >
                           {isRecording ? (
@@ -1174,7 +1145,7 @@ export default function AiPersonaSession({
                     ) : isRecording ||
                       (isUsersTurn && !isAiTalking && !isThinking) ? (
                       <motion.div
-                        layoutId="action-button-user"
+                        layoutId="action-button"
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: 10 }}
@@ -1230,21 +1201,34 @@ export default function AiPersonaSession({
 
                         <Button
                           onClick={
-                            isRecording ? stopAndSubmit : toggleRecording
+                            isConnecting ? stopAndCancel : toggleRecording
                           }
+                          disabled={isThinking}
                           className={cn(
                             "flex-1 h-11 rounded-xl border transition-all duration-300 font-bold text-xs gap-2",
-                            isRecording
-                              ? "bg-red-500 hover:bg-red-600 border-red-400 text-white"
-                              : "bg-emerald-600 hover:bg-emerald-700 border-emerald-500 text-white",
+                            isConnecting
+                              ? "bg-zinc-800 hover:bg-zinc-700 border-zinc-700 text-zinc-300"
+                              : isRecording
+                                ? "bg-red-500 hover:bg-red-600 border-red-400 text-white"
+                                : "bg-emerald-600 hover:bg-emerald-700 border-emerald-500 text-white",
                           )}
                         >
-                          {isRecording ? (
-                            <IconMicrophoneOff size={16} />
+                          {isConnecting ? (
+                            <>
+                              <IconLoader2 className="animate-spin" size={16} />
+                              Connecting (cancel)
+                            </>
+                          ) : isRecording ? (
+                            <>
+                              <IconMicrophoneOff size={16} />
+                              Stop & submit
+                            </>
                           ) : (
-                            <IconMicrophone size={16} />
+                            <>
+                              <IconMicrophone size={16} />
+                              Open microphone
+                            </>
                           )}
-                          {isRecording ? "Stop & submit" : "Open microphone"}
                         </Button>
                       </motion.div>
                     ) : null}
@@ -1254,7 +1238,7 @@ export default function AiPersonaSession({
             </div>
           </motion.div>
 
-          {/* Live Transcription Display */}
+          {/* Live Transcription Display - Positioned at Absolute Bottom Outside All Containers */}
           <AnimatePresence>
             {isRecording && liveTranscript && (
               <motion.div
@@ -1280,6 +1264,7 @@ export default function AiPersonaSession({
             )}
           </AnimatePresence>
 
+          {/* AI Square */}
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
@@ -1291,61 +1276,52 @@ export default function AiPersonaSession({
             )}
           >
             <div className="absolute inset-0 bg-card rounded-[2rem] md:rounded-[2.5rem] border border-border backdrop-blur-xl overflow-hidden shadow-2xl">
+              <div
+                className="absolute inset-0 opacity-5"
+                style={{
+                  backgroundImage:
+                    "radial-gradient(circle, currentColor 1px, transparent 1px)",
+                  backgroundSize: "32px 32px",
+                }}
+              />
+
               <div className="absolute inset-0 flex flex-col items-center justify-center p-6 md:p-8">
                 <div className="relative">
-                  <div
+                  <Avatar
                     className={cn(
-                      "size-32 md:size-48 rounded-[2rem] md:rounded-[2.5rem] bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center shadow-2xl overflow-hidden transition-all duration-500 border border-primary/20",
+                      "size-32 md:size-48 rounded-[2rem] md:rounded-[2.5rem] bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center shadow-2xl transition-all duration-500",
                       isAiTalking
                         ? "ring-4 md:ring-8 ring-primary/20 scale-105"
-                        : "ring-4 md:ring-primary/10",
+                        : "ring-4 ring-primary/20 whitespace-pre-wrap",
                     )}
                   >
-                    {session.aiPersona?.avatar?.url ||
-                    session.aiPersona?.avatarUrl ? (
-                      <Image
-                        src={
-                          (session.aiPersona?.avatar?.url ||
-                            session.aiPersona?.avatarUrl) as string
-                        }
-                        alt={session.aiPersona?.name || "AI"}
-                        fill
-                        className="object-cover"
-                      />
-                    ) : persona?.avatar ? (
-                      <Image
-                        src={persona.avatar}
-                        alt={
-                          session?.aiPersona?.name ||
-                          (persona
-                            ? `${persona.firstName} ${persona.lastName}`.trim()
-                            : "AI")
-                        }
-                        fill
-                        className="object-cover"
-                      />
-                    ) : (
-                      <IconRobot
-                        size={40}
-                        className="md:size-20 text-primary/40"
-                      />
-                    )}
-                  </div>
+                    <AvatarImage
+                      src={interviewer?.avatar}
+                      alt={
+                        interviewer
+                          ? `${interviewer.firstName} ${interviewer.lastName}`
+                          : "AI"
+                      }
+                      className="w-full h-full object-cover"
+                    />
+                    <AvatarFallback className="text-4xl md:text-6xl font-black bg-muted text-foreground rounded-[2rem] md:rounded-[2.5rem]">
+                      {interviewer?.firstName?.[0] || "A"}
+                    </AvatarFallback>
+                  </Avatar>
 
                   {isAiTalking && (
-                    <div className="absolute -inset-4 rounded-[3rem] border-2 border-primary/30 opacity-20 pointer-events-none" />
+                    <div className="absolute -inset-4 rounded-[3rem] border-2 border-primary/30 animate-ping opacity-20 pointer-events-none" />
                   )}
                 </div>
 
-                <div className="mt-4 md:mt-8 text-center flex flex-col items-center">
+                <div className="mt-4 md:mt-8 text-center">
                   <h3 className="text-xl md:text-2xl font-bold tracking-tight">
-                    {session?.aiPersona?.name ||
-                      (persona
-                        ? `${persona.firstName} ${persona.lastName}`.trim()
-                        : "AI Persona")}
+                    {interviewer
+                      ? `${interviewer.firstName} ${interviewer.lastName}`
+                      : "Sarah Miller"}
                   </h3>
-                  <p className="text-primary/60 text-[10px] md:text-sm mt-1 font-bold">
-                    AI Persona
+                  <p className="text-primary/60 text-xs md:text-sm mt-1 font-bold">
+                    Interviewer
                   </p>
                 </div>
 
@@ -1353,7 +1329,7 @@ export default function AiPersonaSession({
                   <AnimatePresence mode="wait">
                     {isAiTalking || isThinking ? (
                       <motion.div
-                        layoutId="action-button-ai"
+                        layoutId="action-button"
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: 10 }}
@@ -1361,7 +1337,7 @@ export default function AiPersonaSession({
                       >
                         <Button
                           disabled
-                          className="w-full h-12 rounded-xl bg-primary/10 border border-primary/30 text-primary font-bold text-xs gap-3 opacity-100"
+                          className="w-full h-12 rounded-xl bg-primary/20 border border-primary/40 text-primary font-bold text-xs gap-3 opacity-100"
                         >
                           <div className="flex gap-1 items-center">
                             {[1, 2, 3].map((i) => (
@@ -1377,9 +1353,11 @@ export default function AiPersonaSession({
                               />
                             ))}
                           </div>
-                          {isThinking
-                            ? `${persona ? `${persona.firstName} ${persona.lastName}`.trim() : "Agent"} is thinking...`
-                            : `${persona ? `${persona.firstName} ${persona.lastName}`.trim() : "Agent"} is speaking...`}
+                          <p className="text-xs font-bold text-primary/40 animate-pulse">
+                            {isThinking
+                              ? `${interviewer ? `${interviewer.firstName} ${interviewer.lastName}` : "Sarah Miller"} is thinking...`
+                              : `${interviewer ? `${interviewer.firstName} ${interviewer.lastName}` : "Sarah Miller"} is speaking...`}
+                          </p>{" "}
                         </Button>
                       </motion.div>
                     ) : null}
@@ -1391,7 +1369,7 @@ export default function AiPersonaSession({
         </div>
       </div>
 
-      {/* Coding Modal */}
+      {/* Custom Coding Modal */}
       <AnimatePresence>
         {isCodingModalOpen && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
@@ -1400,7 +1378,7 @@ export default function AiPersonaSession({
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setIsCodingModalOpen(false)}
-              className="absolute inset-0 bg-background/60 backdrop-blur-3xl"
+              className="absolute inset-0 bg-background/60 backdrop-blur-xl"
             />
 
             <motion.div
@@ -1414,7 +1392,7 @@ export default function AiPersonaSession({
                 <div className="w-full lg:w-[380px] border-b lg:border-b-0 lg:border-r border-border p-8 flex flex-col gap-6 overflow-y-auto bg-muted/5">
                   <div className="flex items-center justify-between">
                     <h2 className="text-2xl font-semibold tracking-tight">
-                      {codingChallenge?.title || "Coding Task"}
+                      {codingChallenge?.title || "Coding Challenge"}
                     </h2>
                     <button
                       onClick={() => setIsCodingModalOpen(false)}
@@ -1426,8 +1404,7 @@ export default function AiPersonaSession({
 
                   <div className="text-sm text-muted-foreground leading-relaxed font-sans prose prose-sm dark:prose-invert max-w-none">
                     <ReactMarkdown>
-                      {codingChallenge?.description ||
-                        "Waiting for instructions..."}
+                      {codingChallenge?.description || ""}
                     </ReactMarkdown>
                   </div>
                 </div>
@@ -1437,7 +1414,7 @@ export default function AiPersonaSession({
                   <div className="h-12 border-b border-border flex items-center px-6 justify-between bg-muted/5">
                     <div className="flex items-center gap-2">
                       <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
-                        {codingChallenge?.language || "universal"} core editor
+                        {codingChallenge?.language} editor
                       </span>
                     </div>
                     <button
@@ -1499,9 +1476,10 @@ export default function AiPersonaSession({
                   <Button
                     onClick={() => {
                       setIsCodingModalOpen(false)
-                      handleSend("I've updated the code. Please review it.", {
-                        code: currentCode,
-                      })
+                      handleUserResponse(
+                        "I have completed the coding challenge. Please review my code.",
+                        currentCode,
+                      )
                     }}
                     className="bg-primary hover:bg-primary/90 text-primary-foreground font-medium text-xs px-8 h-10 rounded-md shadow-sm"
                   >
@@ -1523,12 +1501,18 @@ export default function AiPersonaSession({
             transform: translateY(200%);
           }
         }
+        .cm-editor {
+          outline: none !important;
+        }
+        .cm-scroller {
+          font-family: var(--font-mono) !important;
+        }
       `}</style>
       {/* Generic Modal Tool */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
         <DialogContent className="max-w-xl bg-background border-border rounded-xl p-8 shadow-2xl">
           <DialogHeader className="mb-4">
-            <DialogTitle className="text-2xl font-semibold tracking-tight text-foreground">
+            <DialogTitle className="text-2xl font-semibold tracking-tight">
               {modalTitle || "Information"}
             </DialogTitle>
           </DialogHeader>
@@ -1548,7 +1532,6 @@ export default function AiPersonaSession({
           </div>
         </DialogContent>
       </Dialog>
-
       {/* History Dialog */}
       <Dialog open={isHistoryOpen} onOpenChange={setIsHistoryOpen}>
         <DialogContent
@@ -1569,8 +1552,8 @@ export default function AiPersonaSession({
                 Conversation history
               </DialogTitle>
               <DialogDescription className="text-muted-foreground font-medium">
-                Review every interaction and instruction detail from your
-                persona session.
+                Review every strategic exchange and implementation detail from
+                your session.
               </DialogDescription>
             </div>
           </DialogHeader>
@@ -1579,7 +1562,7 @@ export default function AiPersonaSession({
               <div className="h-full flex flex-col items-center justify-center opacity-20 gap-4">
                 <IconMessages size={120} stroke={0.5} />
                 <p className="text-2xl font-bold">
-                  No history available yet...
+                  Silence is all that&apos;s here...
                 </p>
               </div>
             ) : (
@@ -1600,19 +1583,21 @@ export default function AiPersonaSession({
                           <IconSparkles size={14} className="text-primary" />
                         </div>
                       )}
-                      <span className="text-[10px] font-bold opacity-40">
+                      <span
+                        className={cn(
+                          "text-xs font-bold",
+                          m.role === "user"
+                            ? "text-emerald-500"
+                            : "text-primary",
+                        )}
+                      >
                         {m.role === "user"
-                          ? user?.name || "You"
-                          : Array.isArray(m.parts)
-                            ? m.parts.find(
-                                (p: MessagePart) => p.type === "text",
-                              )?.speakerName ||
-                              (persona
-                                ? `${persona.firstName} ${persona.lastName}`.trim()
-                                : "Agent")
-                            : persona
-                              ? `${persona.firstName} ${persona.lastName}`.trim()
-                              : "Agent"}
+                          ? user?.name || "Candidate"
+                          : m.parts.find((p) => p.type === "text")
+                              ?.speakerName ||
+                            (interviewer
+                              ? `${interviewer.firstName} ${interviewer.lastName}`
+                              : "Sarah Miller")}
                       </span>
                       {m.role === "user" && (
                         <div className="size-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
@@ -1633,13 +1618,43 @@ export default function AiPersonaSession({
                     >
                       <div className="prose prose-sm dark:prose-invert max-w-none text-base">
                         <ReactMarkdown>
-                          {typeof m.parts === "string"
-                            ? m.parts
-                            : (m.parts as MessagePart[]).find(
-                                (p: MessagePart) => p.type === "text",
-                              )?.text || ""}
+                          {m.parts.find((p) => p.type === "text")?.text || ""}
                         </ReactMarkdown>
                       </div>
+
+                      {/* Code Attachment Block */}
+                      {m.parts.find(
+                        (p) =>
+                          p.type === "tool" &&
+                          (p.name === "openCodeEditor" ||
+                            p.name === "open_editor"),
+                      ) && (
+                        <div className="mt-6 p-5 rounded-2xl bg-black/80 font-mono text-[11px] overflow-hidden border border-white/5 relative group">
+                          <div className="flex items-center justify-between mb-4 opacity-50">
+                            <div className="flex items-center gap-2">
+                              <IconCode size={14} />
+                              <span className="font-bold text-[9px]">
+                                Implementation artifact
+                              </span>
+                            </div>
+                            <span className="text-[9px] px-2 py-0.5 rounded-full bg-white/10">
+                              {codingChallenge?.language || "typescript"}
+                            </span>
+                          </div>
+                          <pre className="text-zinc-400 overflow-x-auto custom-scrollbar italic leading-relaxed">
+                            <code>
+                              {
+                                m.parts.find(
+                                  (p) =>
+                                    p.type === "tool" &&
+                                    (p.name === "openCodeEditor" ||
+                                      p.name === "open_editor"),
+                                )?.parameters?.code as string
+                              }
+                            </code>
+                          </pre>
+                        </div>
+                      )}
                     </div>
                   </motion.div>
                 ))}

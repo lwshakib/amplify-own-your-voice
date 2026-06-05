@@ -30,5 +30,11 @@
     ".next/dev/types/**/*.ts",
     "**/*.mts"
   ],
-  "exclude": ["node_modules"]
+  "exclude": [
+    "node_modules",
+    "gemini-live-api-examples-main",
+    "live_api_docs",
+    "ai_docs",
+    "llm"
+  ]
 }

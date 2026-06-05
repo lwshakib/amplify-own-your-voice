@@ -6,8 +6,8 @@ import { validateSession } from "@/lib/auth-utils"
 import { aiService } from "@/services/ai.services"
 // import { getToolPrompt, toolCallsSchema } from "@/lib/tools/registry"
 import { AiResponseSchema } from "@/schemas/chat"
-import { getFeatureLogic } from "@/features/registry"
-import { MessagePart } from "@/features/types"
+import { getFeatureLogic } from "@/lib/features-registry"
+import { MessagePart } from "@/types/features"
 import { z } from "zod"
 
 interface ChatMessage {

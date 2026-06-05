@@ -24,7 +24,7 @@ export async function POST(req: Request) {
 
   try {
     const { getAvatarBuilderPrompt } =
-      await import("@/features/ai_persona/builder-prompts")
+      await import("@/lib/ai-persona/builder-prompts")
     const visualSystemPrompt = getAvatarBuilderPrompt({
       name,
       goal: effectiveGoal,

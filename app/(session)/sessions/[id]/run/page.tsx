@@ -10,7 +10,7 @@
 import { useEffect, useState, use, useRef } from "react"
 import dynamic from "next/dynamic" // Optimizes performance by code-splitting large session features
 import { authClient } from "@/lib/auth-client"
-import { AgentInteraction, Message } from "@/features/types"
+import { AgentInteraction, Message } from "@/types/features"
 
 /**
  * Dynamic Imports
@@ -19,20 +19,20 @@ import { AgentInteraction, Message } from "@/features/types"
  * 'window', and the Web Audio API immediately on mount.
  */
 const InterviewSession = dynamic(
-  () => import("@/features/interview/InterviewSession"),
+  () => import("@/components/interview/InterviewSession"),
   {
     ssr: false,
     loading: () => <SessionLoader label="Loading Interview Environment..." />,
   },
 )
 const AiPersonaSession = dynamic(
-  () => import("@/features/ai_persona/AiPersonaSession"),
+  () => import("@/components/ai-persona/AiPersonaSession"),
   {
     ssr: false,
     loading: () => <SessionLoader label="Loading AI Personality..." />,
   },
 )
-const DebateSession = dynamic(() => import("@/features/debate/DebateSession"), {
+const DebateSession = dynamic(() => import("@/components/debate/DebateSession"), {
   ssr: false,
   loading: () => <SessionLoader label="Preparing Debate Floor..." />,
 })

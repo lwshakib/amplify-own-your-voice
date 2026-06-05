@@ -1,7 +1,7 @@
 import { interview_logic } from "./interview/logic"
-import { ai_persona_logic } from "./ai_persona/logic"
+import { ai_persona_logic } from "./ai-persona/logic"
 import { debate_logic } from "./debate/logic"
-import { FeatureLogic } from "./types"
+import { FeatureLogic } from "@/types/features"
 
 export type { FeatureLogic }
 
