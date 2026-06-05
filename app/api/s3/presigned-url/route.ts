@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { s3Service } from '@/services/s3.services';
+import { getPresignedUploadUrl } from '@/lib/s3';
 import { auth } from '@/lib/auth';
 import { headers } from 'next/headers';
 
@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing path or contentType' }, { status: 400 });
     }
 
-    const url = await s3Service.getPresignedUploadUrl(path, contentType);
+    const url = await getPresignedUploadUrl(path, contentType);
 
     return NextResponse.json({ url });
   } catch (error: any) {

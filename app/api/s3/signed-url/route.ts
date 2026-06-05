@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { s3Service } from '@/services/s3.services';
+import { getSignedDownloadUrl } from '@/lib/s3';
 import { auth } from '@/lib/auth';
 import { headers } from 'next/headers';
 
@@ -22,7 +22,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Missing object path' }, { status: 400 });
     }
 
-    const url = await s3Service.getSignedDownloadUrl(path);
+    const url = await getSignedDownloadUrl(path);
 
     return NextResponse.json({ url });
   } catch (error: any) {
