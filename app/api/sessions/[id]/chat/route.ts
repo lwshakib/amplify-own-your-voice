@@ -1,4 +1,4 @@
-import { s3Service } from "@/services/s3.services"
+import { getSignedDownloadUrl } from "@/lib/s3"
 import { NextRequest, NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { Prisma } from "@/generated/prisma/client"
@@ -193,7 +193,7 @@ export async function POST(
     if (textPart) {
       try {
         const audioData = await aiService.textToSpeech(textPart.text || "", model)
-        const signedUrl = await s3Service.getSignedDownloadUrl(audioData.path)
+        const signedUrl = await getSignedDownloadUrl(audioData.path)
 
         textPart.audio = {
           path: audioData.path,

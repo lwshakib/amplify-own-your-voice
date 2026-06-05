@@ -1,4 +1,4 @@
-import { s3Service } from "@/services/s3.services"
+import { getSignedDownloadUrl, deleteFile } from "@/lib/s3"
 import { NextRequest, NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { auth } from "@/lib/auth"
@@ -65,7 +65,7 @@ export async function GET(
       const processedParts = await Promise.all(parts.map(async (part) => {
         if (part.audio?.path) {
           try {
-            const signedUrl = await s3Service.getSignedDownloadUrl(part.audio.path)
+            const signedUrl = await getSignedDownloadUrl(part.audio.path)
             return {
               ...part,
               audio: { ...part.audio, url: signedUrl }
@@ -85,7 +85,7 @@ export async function GET(
       const avatar = processedAiPersona.avatar as any
       if (avatar.path) {
         try {
-          const signedUrl = await s3Service.getSignedDownloadUrl(avatar.path)
+          const signedUrl = await getSignedDownloadUrl(avatar.path)
           processedAiPersona = {
             ...processedAiPersona,
             avatar: { ...avatar, url: signedUrl }
@@ -144,7 +144,7 @@ export async function DELETE(
 
     for (const path of paths) {
       try {
-        await s3Service.deleteFile(path)
+        await deleteFile(path)
       } catch (err: unknown) {
         console.error(`Failed to delete S3 asset ${path}:`, err)
       }
