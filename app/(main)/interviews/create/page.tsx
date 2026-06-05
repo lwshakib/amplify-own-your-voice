@@ -74,13 +74,31 @@ export default function CreateInterviewPage() {
 
       if (!reader) return
 
+      let buffer = ""
       // Read the stream chunk-by-chunk for a smooth 'typing' effect
       while (true) {
         const { done, value } = await reader.read()
         if (done) break
 
-        const chunk = decoder.decode(value)
-        setDescription((prev) => prev + chunk)
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split("\n")
+        buffer = lines.pop() || ""
+
+        for (const line of lines) {
+          const trimmed = line.trim()
+          if (!trimmed) continue
+          if (trimmed.startsWith("data: ")) {
+            const dataStr = trimmed.slice(6)
+            try {
+              const parsed = JSON.parse(dataStr)
+              if (parsed.type === "text" && parsed.content) {
+                setDescription((prev) => prev + parsed.content)
+              }
+            } catch (err) {
+              // Ignore partial or malformed lines during streaming
+            }
+          }
+        }
       }
     } catch (error) {
       if (error instanceof Error && error.name === "AbortError") {

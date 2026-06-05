@@ -102,81 +102,16 @@ export default function InterviewSession({
 
   const isInitialized = useRef(false)
   const abortControllerRef = useRef<AbortController | null>(null)
-  const audioRef = useRef<HTMLAudioElement | null>(null)
   const isMutedRef = useRef(false)
   const isPausedRef = useRef(false)
-  const [audio, setAudio] = useState<HTMLAudioElement | null>(null)
 
   const fluxWsRef = useRef<WebSocket | null>(null)
   const audioContextRef = useRef<AudioContext | null>(null)
   const processorRef = useRef<ScriptProcessorNode | null>(null)
   const [isGeneratingSolution, setIsGeneratingSolution] = useState(false)
   const micStreamRef = useRef<MediaStream | null>(null)
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
-  const audioChunksRef = useRef<Blob[]>([])
-  const connectionAttemptRef = useRef<number>(0)
   const lastPartialRef = useRef("")
   const solutionAbortControllerRef = useRef<AbortController | null>(null)
-
-  const fetchAsrToken = useCallback(async () => {
-    try {
-      const res = await fetch("/api/asr/token")
-      if (!res.ok) throw new Error("Failed to get ASR token")
-      const { token } = await res.json()
-      return token
-    } catch (e) {
-      console.error("ASR Token Error:", e)
-      return null
-    }
-  }, [])
-
-  const stopFluxAsr = useCallback(() => {
-    setIsConnecting(false)
-    if (processorRef.current) {
-      processorRef.current.disconnect()
-      processorRef.current = null
-    }
-    if (audioContextRef.current) {
-      audioContextRef.current.close()
-      audioContextRef.current = null
-    }
-    if (micStreamRef.current) {
-      micStreamRef.current.getTracks().forEach((t) => t.stop())
-      micStreamRef.current = null
-    }
-    if (fluxWsRef.current) {
-      fluxWsRef.current.close()
-      fluxWsRef.current = null
-    }
-    if (
-      mediaRecorderRef.current &&
-      mediaRecorderRef.current.state !== "inactive"
-    ) {
-      mediaRecorderRef.current.stop()
-    }
-  }, [])
-
-  const stopAll = useCallback(() => {
-    if (abortControllerRef.current) abortControllerRef.current.abort()
-    if (audioRef.current) {
-      audioRef.current.pause()
-      audioRef.current.src = ""
-    }
-    stopFluxAsr()
-    setIsRecording(false)
-    setIsAiTalking(false)
-    setIsThinking(false)
-    setIsUserTalking(false)
-    setIsAiStreaming(false)
-  }, [stopFluxAsr])
-
-  const handleExit = useCallback(
-    (path: string) => {
-      stopAll()
-      router.push(path)
-    },
-    [stopAll, router],
-  )
 
   const handleToolCalls = useCallback((toolCalls: MessagePart[]) => {
     toolCalls.forEach((tc: MessagePart) => {
@@ -254,115 +189,595 @@ export default function InterviewSession({
     }
   }
 
-  const fetchAiResponse = useCallback(
-    async (
-      history: Message[],
-      code?: string,
-      audioUrl?: string,
-      audioPath?: string,
-    ) => {
-      try {
-        if (abortControllerRef.current) abortControllerRef.current.abort()
-        abortControllerRef.current = new AbortController()
+  // Refs for audio playback and tracking
+  const playbackContextRef = useRef<AudioContext | null>(null)
+  const nextPlaybackTimeRef = useRef<number>(0)
+  const activePlaybackNodes = useRef<Set<AudioBufferSourceNode>>(new Set())
+  const accumulatedOutputTextRef = useRef<string>("")
+  const lastUserTextRef = useRef<string>("")
 
-        const response = await fetch(`/api/sessions/${id}/chat`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            messages: history,
-            code,
-            duration: timerRef.current,
-            audioUrl,
-            audioPath,
-          }),
-          signal: abortControllerRef.current.signal,
-        })
-        if (!response.ok) throw new Error("Failed to fetch AI response")
-        const data = await response.json()
-        const toolCalls =
-          data.parts?.filter((p: MessagePart) => p.type === "tool") || []
-        if (toolCalls.length > 0) {
-          handleToolCalls(toolCalls)
-        }
+  const getPlaybackContext = () => {
+    if (!playbackContextRef.current) {
+      playbackContextRef.current = new (
+        window.AudioContext ||
+        (window as unknown as { webkitAudioContext: typeof AudioContext })
+          .webkitAudioContext
+      )({ sampleRate: 24000 })
+    }
+    return playbackContextRef.current
+  }
 
-        if (data.status === "COMPLETED" || data.status === "Completed") {
-          setSession((prev) => (prev ? { ...prev, status: "COMPLETED" } : prev))
-        }
+  const playPcmChunk = async (base64Data: string) => {
+    try {
+      const ctx = getPlaybackContext()
+      if (!ctx) return
 
-        const textPart = data.parts?.find((p: MessagePart) => p.type === "text")
-
-        return {
-          text: textPart?.text || "",
-          isCompleted:
-            data.status === "COMPLETED" || data.status === "Completed",
-          audioUrl: textPart?.audio?.url,
-          audioPath: textPart?.audio?.path,
-          speakerName: textPart?.speakerName || "Agent",
-          speakerTitle: textPart?.speakerTitle || "Interviewer",
-          isUsersTurn: textPart?.isUsersTurn ?? true,
-          toolCalls: toolCalls as MessagePart[],
-          userMsgId: data.userMessageId,
-        }
-      } catch (error: unknown) {
-        if (error instanceof Error && error.name === "AbortError")
-          return "AbortError"
-        console.error("AI Error:", error)
-        return null
-      }
-    },
-    [id, handleToolCalls],
-  )
-
-  const speak = useCallback(
-    async (
-      text: string,
-      isCompleted: boolean = false,
-      audioUrl?: string,
-      setTurnAtEnd: boolean = true,
-    ) => {
-      if (audio) {
-        audio.pause()
-        audio.src = ""
+      if (ctx.state === "suspended") {
+        await ctx.resume()
       }
 
-      try {
-        setIsThinking(true)
-        if (!audioUrl) return
-        const url = audioUrl
-        const newAudio = new Audio(url)
+      const binaryString = window.atob(base64Data)
+      const length = binaryString.length
+      const bytes = new Uint8Array(length)
+      for (let i = 0; i < length; i++) {
+        bytes[i] = binaryString.charCodeAt(i)
+      }
 
-        newAudio.onplay = () => {
-          setIsAiTalking(true)
+      const int16Array = new Int16Array(bytes.buffer)
+      const float32Array = new Float32Array(int16Array.length)
+      for (let i = 0; i < int16Array.length; i++) {
+        float32Array[i] = int16Array[i] / 32768.0
+      }
+
+      const audioBuffer = ctx.createBuffer(1, float32Array.length, 24000)
+      audioBuffer.getChannelData(0).set(float32Array)
+
+      const source = ctx.createBufferSource()
+      source.buffer = audioBuffer
+      source.connect(ctx.destination)
+
+      const now = ctx.currentTime
+      if (nextPlaybackTimeRef.current < now) {
+        nextPlaybackTimeRef.current = now
+      }
+
+      source.start(nextPlaybackTimeRef.current)
+      nextPlaybackTimeRef.current += audioBuffer.duration
+
+      activePlaybackNodes.current.add(source)
+      source.onended = () => {
+        activePlaybackNodes.current.delete(source)
+      }
+    } catch (error) {
+      console.error("PCM playback error:", error)
+    }
+  }
+
+  const stopAudioPlayback = () => {
+    activePlaybackNodes.current.forEach((node) => {
+      try {
+        node.stop()
+      } catch (e) {}
+    })
+    activePlaybackNodes.current.clear()
+    nextPlaybackTimeRef.current = playbackContextRef.current?.currentTime || 0
+    setIsAiTalking(false)
+    setIsThinking(false)
+  }
+
+  // Connect to Gemini Multimodal Live API over raw WebSockets
+  const connectGeminiLive = useCallback(async () => {
+    if (isInitialized.current) return
+    isInitialized.current = true
+
+    setIsConnecting(true)
+    setIsThinking(true)
+
+    try {
+      const charId = session.interview?.characterId || "sarah"
+      const character = getCharacter(charId)
+      setInterviewer(character)
+
+      const tokenRes = await fetch(`/api/sessions/${id}/live-token`)
+      if (!tokenRes.ok) throw new Error("Failed to fetch live ephemeral token")
+      const { token, model, systemInstructions, voiceName } = await tokenRes.json()
+
+      const wsUrl = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContentConstrained?access_token=${token}`
+      const ws = new WebSocket(wsUrl)
+      fluxWsRef.current = ws
+
+      ws.onopen = () => {
+        setIsConnecting(false)
+
+        // Send setup configuration
+        const setupMsg = {
+          setup: {
+            model: `models/${model}`,
+            generationConfig: {
+              responseModalities: ["AUDIO"],
+              speechConfig: {
+                voiceConfig: {
+                  prebuiltVoiceConfig: {
+                    voiceName,
+                  },
+                },
+              },
+            },
+            systemInstruction: {
+              parts: [{ text: systemInstructions }],
+            },
+            inputAudioTranscription: {},
+            outputAudioTranscription: {},
+            realtimeInputConfig: {
+              automaticActivityDetection: {
+                disabled: false,
+                silenceDurationMs: 2000,
+                prefixPaddingMs: 500,
+              },
+            },
+          },
+        }
+        ws.send(JSON.stringify(setupMsg))
+
+        // Seed initial history or prompt to greet
+        if (messages.length > 0) {
+          const turns = messages.map((m) => ({
+            role: m.role === "user" ? "user" : "model",
+            parts: [
+              {
+                text:
+                  typeof m.parts === "string"
+                    ? m.parts
+                    : (m.parts as MessagePart[])?.find((p) => p.type === "text")
+                        ?.text || "",
+              },
+            ],
+          }))
+          ws.send(JSON.stringify({ clientContent: { turns, turnComplete: true } }))
           setIsThinking(false)
+          setIsUsersTurn(messages[messages.length - 1].role === "assistant")
+        } else {
+          // Trigger first turn greeting
+          ws.send(
+            JSON.stringify({
+              realtimeInput: {
+                text: "Please start the session by greeting the candidate and introducing yourself.",
+              },
+            }),
+          )
+        }
+      }
+
+      ws.onmessage = async (event) => {
+        if (isPausedRef.current) return
+
+        let jsonData
+        if (event.data instanceof Blob) {
+          jsonData = await event.data.text()
+        } else if (event.data instanceof ArrayBuffer) {
+          jsonData = new TextDecoder().decode(event.data)
+        } else {
+          jsonData = event.data
         }
 
-        newAudio.onended = () => {
-          setIsAiTalking(false)
-          setIsThinking(false)
-          if (setTurnAtEnd) setIsUsersTurn(true)
-          if (!audioUrl && url) URL.revokeObjectURL(url)
+        try {
+          const response = JSON.parse(jsonData)
 
-          if (isCompleted) {
-            handleExit(`/sessions/${id}`)
+          // Handle interruption
+          if (response.serverContent?.interrupted) {
+            console.log("Interruption detected")
+            stopAudioPlayback()
+            return
           }
-        }
 
-        audioRef.current = newAudio
-        setAudio(newAudio)
-        newAudio.play().catch((err) => {
-          if (err.name === "AbortError") return
-          console.error("Play error:", err)
-          setIsAiTalking(false)
-          setIsThinking(false)
-        })
-      } catch (error) {
-        console.error("Speech error:", error)
-        setIsAiTalking(false)
+          // Play incoming audio chunks
+          const parts = response.serverContent?.modelTurn?.parts
+          if (parts) {
+            for (const part of parts) {
+              if (part.inlineData?.data) {
+                playPcmChunk(part.inlineData.data)
+                setIsAiTalking(true)
+                setIsThinking(false)
+              }
+            }
+          }
+
+          // Handle input transcription (user speaking)
+          if (response.serverContent?.inputTranscription) {
+            const userText = response.serverContent.inputTranscription.text
+            if (userText) {
+              setLiveTranscript(userText)
+              lastUserTextRef.current = userText
+            }
+          }
+
+          // Handle output transcription (model speaking)
+          if (response.serverContent?.outputTranscription) {
+            const outputText = response.serverContent.outputTranscription.text
+            if (outputText) {
+              accumulatedOutputTextRef.current += outputText
+            }
+          }
+
+          // Handle turn complete
+          if (response.serverContent?.turnComplete) {
+            const finalUserText = lastUserTextRef.current.trim()
+            const finalOutputText = accumulatedOutputTextRef.current.trim()
+
+            // Save user message to database if present
+            if (finalUserText) {
+              await fetch(`/api/sessions/${id}/messages`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  role: "user",
+                  text: finalUserText,
+                  speakerName: authSession?.user?.name || "Candidate",
+                  speakerTitle: "Candidate",
+                  duration: timerRef.current,
+                }),
+              })
+
+              const userMsg: Message = {
+                role: "user",
+                parts: [
+                  {
+                    type: "text",
+                    text: finalUserText,
+                    speakerName: authSession?.user?.name || "Candidate",
+                    speakerTitle: "Candidate",
+                    isUsersTurn: false,
+                    audio: { url: null, path: null },
+                  },
+                ],
+              }
+              setMessages((prev) => [...prev, userMsg])
+              lastUserTextRef.current = ""
+            }
+
+            // Sync saving the interviewer's reply with the audio playback end
+            const now = playbackContextRef.current?.currentTime || 0
+            const playDelay = (nextPlaybackTimeRef.current - now) * 1000
+
+            setTimeout(async () => {
+              if (finalOutputText) {
+                await fetch(`/api/sessions/${id}/messages`, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    role: "assistant",
+                    text: finalOutputText,
+                    speakerName:
+                      character ? `${character.firstName} ${character.lastName}` : "Sarah Miller",
+                    speakerTitle: "Interviewer",
+                    duration: timerRef.current,
+                  }),
+                })
+
+                const assistantMsg: Message = {
+                  role: "assistant",
+                  parts: [
+                    {
+                      type: "text",
+                      text: finalOutputText,
+                      speakerName:
+                        character ? `${character.firstName} ${character.lastName}` : "Sarah Miller",
+                      speakerTitle: "Interviewer",
+                      isUsersTurn: true,
+                      audio: { url: null, path: null },
+                    },
+                  ],
+                }
+                setMessages((prev) => [...prev, assistantMsg])
+                accumulatedOutputTextRef.current = ""
+              }
+
+              setIsAiTalking(false)
+              setIsUsersTurn(true)
+            }, Math.max(0, playDelay))
+          }
+        } catch (err) {
+          console.error("Error processing Gemini response:", err)
+        }
+      }
+
+      ws.onerror = (err) => {
+        console.error("Gemini Live WebSocket error:", err)
+        setIsConnecting(false)
         setIsThinking(false)
       }
+
+      ws.onclose = () => {
+        console.log("Gemini Live WebSocket closed")
+        setIsConnecting(false)
+        setIsThinking(false)
+      }
+    } catch (error) {
+      console.error("Failed to connect to Gemini Live API:", error)
+      setIsConnecting(false)
+      setIsThinking(false)
+    }
+  }, [id, session, authSession, messages.length])
+
+  // Setup mount connection
+  useEffect(() => {
+    connectGeminiLive()
+  }, [connectGeminiLive])
+
+  const stopMicrophoneStreaming = () => {
+    if (processorRef.current) {
+      processorRef.current.disconnect()
+      processorRef.current = null
+    }
+    if (audioContextRef.current) {
+      audioContextRef.current.close()
+      audioContextRef.current = null
+    }
+    if (micStreamRef.current) {
+      micStreamRef.current.getTracks().forEach((track) => track.stop())
+      micStreamRef.current = null
+    }
+    if (
+      fluxWsRef.current &&
+      fluxWsRef.current.readyState === WebSocket.OPEN
+    ) {
+      // Send audioStreamEnd to signal end of user turn
+      fluxWsRef.current.send(JSON.stringify({ realtimeInput: { audioStreamEnd: true } }))
+    }
+  }
+
+  const startMicrophoneStreaming = async () => {
+    if (!fluxWsRef.current || fluxWsRef.current.readyState !== WebSocket.OPEN) {
+      toast.error("WebSocket connection is not open.")
+      return
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          sampleRate: 16000,
+          channelCount: 1,
+          echoCancellation: true,
+        },
+      })
+
+      micStreamRef.current = stream
+      setIsRecording(true)
+
+      const audioContext = new (
+        window.AudioContext ||
+        (window as unknown as { webkitAudioContext: typeof AudioContext })
+          .webkitAudioContext
+      )({ sampleRate: 16000 })
+      audioContextRef.current = audioContext
+
+      const source = audioContext.createMediaStreamSource(stream)
+      const processor = audioContext.createScriptProcessor(4096, 1, 1)
+      processorRef.current = processor
+
+      processor.onaudioprocess = (e) => {
+        if (
+          fluxWsRef.current?.readyState === WebSocket.OPEN &&
+          !isMutedRef.current &&
+          !isPausedRef.current
+        ) {
+          const inputData = e.inputBuffer.getChannelData(0)
+          const pcmData = new Int16Array(inputData.length)
+          for (let i = 0; i < inputData.length; i++) {
+            pcmData[i] = Math.max(-1, Math.min(1, inputData[i])) * 0x7fff
+          }
+
+          // Serialize to base64
+          let binary = ""
+          const bytes = new Uint8Array(pcmData.buffer)
+          for (let i = 0; i < bytes.byteLength; i++) {
+            binary += String.fromCharCode(bytes[i])
+          }
+          const base64Audio = window.btoa(binary)
+
+          // Send chunk to Gemini
+          fluxWsRef.current.send(
+            JSON.stringify({
+              realtimeInput: {
+                audio: {
+                  data: base64Audio,
+                  mimeType: "audio/pcm;rate=16000",
+                },
+              },
+            }),
+          )
+        }
+      }
+
+      source.connect(processor)
+      processor.connect(audioContext.destination)
+    } catch (e) {
+      console.error("Failed to access microphone:", e)
+      toast.error("Could not access microphone.")
+    }
+  }
+
+  const startRecording = () => {
+    setIsConnecting(true)
+    transcriptRef.current = ""
+    lastPartialRef.current = ""
+    setLiveTranscript("")
+    setIsConnecting(false)
+    startMicrophoneStreaming()
+  }
+
+  const stopAndSubmit = () => {
+    setIsRecording(false)
+    stopMicrophoneStreaming()
+    setIsMuted(false)
+    setIsPaused(false)
+  }
+
+  const toggleRecording = () => {
+    if (isRecording) stopAndSubmit()
+    else startRecording()
+  }
+
+  const stopAndCancel = () => {
+    setIsRecording(false)
+    stopMicrophoneStreaming()
+  }
+
+  const stopAll = useCallback(() => {
+    stopMicrophoneStreaming()
+    stopAudioPlayback()
+
+    if (fluxWsRef.current) {
+      fluxWsRef.current.close()
+      fluxWsRef.current = null
+    }
+    if (playbackContextRef.current) {
+      playbackContextRef.current.close()
+      playbackContextRef.current = null
+    }
+
+    setIsRecording(false)
+    setIsAiTalking(false)
+    setIsThinking(false)
+    setIsUserTalking(false)
+    setIsAiStreaming(false)
+  }, [])
+
+  const handleExit = useCallback(
+    (path: string) => {
+      stopAll()
+      router.push(path)
     },
-    [audio, id, handleExit],
+    [stopAll, router],
   )
+
+  const handleUserResponse = async (text: string, code?: string) => {
+    // If user submits code manually, push it down the WebSocket as text input
+    if (fluxWsRef.current && fluxWsRef.current.readyState === WebSocket.OPEN) {
+      setIsThinking(true)
+      const codeSubmissionText = code
+        ? `Here is my code submission:\n${code}`
+        : text
+
+      fluxWsRef.current.send(
+        JSON.stringify({
+          realtimeInput: {
+            text: codeSubmissionText,
+          },
+        }),
+      )
+
+      await fetch(`/api/sessions/${id}/messages`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          role: "user",
+          text: codeSubmissionText,
+          speakerName: authSession?.user?.name || "Candidate",
+          speakerTitle: "Candidate",
+          duration: timerRef.current,
+        }),
+      })
+
+      const userMsg: Message = {
+        role: "user",
+        parts: [
+          {
+            type: "text",
+            text: codeSubmissionText,
+            speakerName: authSession?.user?.name || "Candidate",
+            speakerTitle: "Candidate",
+            isUsersTurn: false,
+            audio: { url: null, path: null },
+          },
+        ],
+      }
+      setMessages((prev) => [...prev, userMsg])
+    }
+  }
+
+  const handleGenerateWithAi = async () => {
+    if (isAiStreaming) return
+
+    setIsAiStreaming(true)
+    setShowAiSuggestion(true)
+    setStreamedText("")
+    setIsThinking(false)
+
+    const currentAbortController = new AbortController()
+    abortControllerRef.current = currentAbortController
+
+    try {
+      const response = await fetch("/api/chat/stream", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: messages,
+          candidateName: user?.name,
+          interviewerName: interviewer
+            ? `${interviewer.firstName} ${interviewer.lastName}`
+            : "Sarah Miller",
+          interviewType: session?.interview?.type,
+          jobTitle: session?.interview?.jobTitle,
+          jobDescription: session?.interview?.description,
+          sessionType: "interview",
+        }),
+        signal: currentAbortController.signal,
+      })
+
+      if (!response.ok) throw new Error("Streaming failed")
+
+      const reader = response.body?.getReader()
+      const decoder = new TextDecoder()
+
+      if (reader) {
+        let buffer = ""
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+
+          buffer += decoder.decode(value, { stream: true })
+          const lines = buffer.split("\n")
+          buffer = lines.pop() || ""
+
+          for (const line of lines) {
+            const trimmed = line.trim()
+            if (!trimmed) continue
+            if (trimmed.startsWith("data: ")) {
+              const dataStr = trimmed.slice(6)
+              try {
+                const parsed = JSON.parse(dataStr)
+                if (parsed.type === "text" && parsed.content) {
+                  setStreamedText((prev) => prev + parsed.content)
+                }
+              } catch (err) {
+                // Ignore parsing errors
+              }
+            }
+          }
+        }
+      }
+    } catch (error: unknown) {
+      if (error instanceof Error && error.name !== "AbortError") {
+        console.error("Streaming error:", error)
+      }
+    } finally {
+      setIsAiStreaming(false)
+    }
+  }
+
+  const handleCancelSuggestion = () => {
+    if (abortControllerRef.current) abortControllerRef.current.abort()
+    setIsAiStreaming(false)
+    setShowAiSuggestion(false)
+    setStreamedText("")
+  }
+
+  const handleOpenMicFromSuggestion = () => {
+    if (abortControllerRef.current) abortControllerRef.current.abort()
+    setIsAiStreaming(false)
+    startRecording()
+  }
 
   // Timer Effect
   useEffect(() => {
@@ -411,483 +826,14 @@ export default function InterviewSession({
         if (toolCalls.length > 0) {
           handleToolCalls(toolCalls)
         }
-
-        const textToSpeak =
-          textPart?.text ||
-          (typeof lastMsg.parts === "string" ? lastMsg.parts : "")
-
-        speak(
-          textToSpeak,
-          lastMsg.status === "COMPLETED" || lastMsg.status === "Completed",
-          audioUrl,
-        )
       }
-    } else {
-      // AI Starts first if no history
-      const startInteraction = async () => {
-        setIsThinking(true)
-        const aiResponse = await fetchAiResponse([])
-
-        // If aborted, don't do anything as a second request is likely coming
-        if (aiResponse === "AbortError") return
-
-        if (aiResponse && typeof aiResponse !== "string") {
-          isInitialized.current = true
-          const assistantMsg: Message = {
-            role: "assistant",
-            parts: [
-              {
-                type: "text" as const,
-                text: aiResponse.text,
-                speakerName: aiResponse.speakerName,
-                speakerTitle: aiResponse.speakerTitle,
-                isUsersTurn: !!aiResponse.isUsersTurn,
-                audio: {
-                  path: aiResponse.audioPath,
-                  url: aiResponse.audioUrl || null,
-                },
-              },
-              ...(aiResponse.toolCalls
-                ? (aiResponse.toolCalls as MessagePart[]).map(
-                    (tc: MessagePart) => ({
-                      type: "tool" as const,
-                      name: (tc.name || tc.tool?.name || "") as string,
-                      parameters: (tc.parameters ||
-                        tc.tool?.parameters ||
-                        {}) as Record<string, unknown>,
-                    }),
-                  )
-                : []),
-            ],
-          }
-          setMessages([assistantMsg])
-          setIsUsersTurn(!!aiResponse.isUsersTurn)
-          speak(
-            aiResponse.text,
-            aiResponse.isCompleted,
-            aiResponse.audioUrl,
-            !!aiResponse.isUsersTurn,
-          )
-        } else {
-          setIsThinking(false)
-          setIsUsersTurn(true)
-        }
-      }
-      startInteraction()
     }
   }, [
     messages.length,
-    fetchAiResponse,
-    speak,
     session.interview?.characterId,
     handleToolCalls,
     messages,
   ])
-
-  const stopAndCancel = () => {
-    connectionAttemptRef.current = 0
-    setIsRecording(false)
-    stopFluxAsr()
-  }
-
-  const startFluxAsr = async () => {
-    const currentAttempt = connectionAttemptRef.current
-    const token = await fetchAsrToken()
-
-    if (connectionAttemptRef.current !== currentAttempt) return
-
-    if (!token) {
-      setIsConnecting(false)
-      return
-    }
-
-    const workerUrl = `${process.env.NEXT_PUBLIC_FLUX_WORKER_URL || "wss://flux.leadwithshakib.workers.dev/"}?token=${token}`
-
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          sampleRate: 16000,
-          channelCount: 1,
-          echoCancellation: true,
-        },
-      })
-
-      if (connectionAttemptRef.current !== currentAttempt) {
-        stream.getTracks().forEach((t) => t.stop())
-        return
-      }
-
-      micStreamRef.current = stream
-      fluxWsRef.current = new WebSocket(workerUrl)
-
-      fluxWsRef.current.onopen = () => {
-        if (connectionAttemptRef.current !== currentAttempt) {
-          fluxWsRef.current?.close()
-          return
-        }
-        setIsConnecting(false)
-        setIsRecording(true)
-        const audioContext = new (
-          window.AudioContext ||
-          (window as unknown as { webkitAudioContext: typeof AudioContext })
-            .webkitAudioContext
-        )({ sampleRate: 16000 })
-        audioContextRef.current = audioContext
-
-        const source = audioContext.createMediaStreamSource(
-          micStreamRef.current!,
-        )
-        const processor = audioContext.createScriptProcessor(4096, 1, 1)
-        processorRef.current = processor
-
-        processor.onaudioprocess = (e: { inputBuffer: AudioBuffer }) => {
-          // Strictly check for Muted or Paused states
-          if (
-            fluxWsRef.current?.readyState === WebSocket.OPEN &&
-            !isMutedRef.current &&
-            !isPausedRef.current
-          ) {
-            const inputData = e.inputBuffer.getChannelData(0)
-            const pcmData = new Int16Array(inputData.length)
-            for (let i = 0; i < inputData.length; i++) {
-              pcmData[i] = Math.max(-1, Math.min(1, inputData[i])) * 0x7fff
-            }
-            fluxWsRef.current.send(pcmData.buffer)
-          }
-        }
-
-        source.connect(processor)
-        processor.connect(audioContext.destination)
-
-        // Standard MediaRecorder for high quality audio file upload
-        const mediaRecorder = new MediaRecorder(micStreamRef.current!)
-        mediaRecorderRef.current = mediaRecorder
-        audioChunksRef.current = []
-        mediaRecorder.ondataavailable = (e) => {
-          if (e.data.size > 0) audioChunksRef.current.push(e.data)
-        }
-        mediaRecorder.start()
-      }
-
-      fluxWsRef.current.onmessage = (e: { data: string }) => {
-        if (isPausedRef.current) return
-        try {
-          const data = JSON.parse(e.data)
-          if (data.transcript) {
-            const clean = data.transcript.trim()
-            if (clean) {
-              // Heuristic: If current transcript is shorter than what we saw,
-              // the worker might have reset for a new utterance without is_final: true.
-              // We should commit the previous partial to the ref.
-              if (
-                lastPartialRef.current &&
-                data.transcript.length < lastPartialRef.current.length * 0.7 &&
-                !data.transcript
-                  .toLowerCase()
-                  .startsWith(
-                    lastPartialRef.current.toLowerCase().substring(0, 5),
-                  )
-              ) {
-                transcriptRef.current += lastPartialRef.current + " "
-                lastPartialRef.current = ""
-              }
-
-              lastPartialRef.current = data.transcript
-              const currentFull = (
-                transcriptRef.current +
-                " " +
-                data.transcript
-              )
-                .replace(/\s+/g, " ")
-                .trim()
-              setLiveTranscript(currentFull)
-
-              if (!isMutedRef.current && data.is_final) {
-                transcriptRef.current =
-                  (transcriptRef.current + " " + data.transcript)
-                    .replace(/\s+/g, " ")
-                    .trim() + " "
-                lastPartialRef.current = ""
-                setLiveTranscript(transcriptRef.current)
-              }
-            }
-          }
-        } catch (err) {
-          console.error("ASR Data Error:", err)
-        }
-      }
-
-      fluxWsRef.current.onerror = (err) => {
-        console.error("ASR WS Error:", err)
-        stopFluxAsr()
-        setIsRecording(false)
-      }
-      fluxWsRef.current.onclose = () => stopFluxAsr()
-    } catch (e) {
-      console.error("Mic Access Error:", e)
-      setIsConnecting(false)
-      setIsRecording(false)
-    }
-  }
-
-  const startRecording = () => {
-    const attempt = Date.now()
-    connectionAttemptRef.current = attempt
-    setIsConnecting(true)
-    transcriptRef.current = ""
-    lastPartialRef.current = ""
-    setLiveTranscript("")
-    startFluxAsr()
-  }
-
-  const stopAndSubmit = async () => {
-    setIsRecording(false)
-
-    // Start upload in parallel
-    const audioUploadPromise = (async () => {
-      if (
-        mediaRecorderRef.current &&
-        mediaRecorderRef.current.state !== "inactive"
-      ) {
-        const audioPromise = new Promise<Blob>((resolve) => {
-          mediaRecorderRef.current!.onstop = () => {
-            const blob = new Blob(audioChunksRef.current, {
-              type: "audio/webm",
-            })
-            resolve(blob)
-          }
-        })
-        mediaRecorderRef.current.stop()
-        const audioBlob = await audioPromise
-
-        try {
-          const { uploadToS3Client } = await import("@/lib/s3-client")
-          const path = await uploadToS3Client(audioBlob, "audio")
-
-          // Optionally get a temporary signed URL
-          const res = await fetch(
-            `/api/s3/signed-url?path=${encodeURIComponent(path)}`,
-          )
-          const { url } = await res.json()
-
-          return { url, path } // Updated return type
-        } catch (err) {
-          console.error("Failed to upload user audio to S3:", err)
-          return null
-        }
-      }
-      return null
-    })()
-
-    stopFluxAsr()
-    setIsMuted(false)
-    setIsPaused(false)
-
-    // Capture the final string from the display buffer
-    const finalTranscriptText = (
-      transcriptRef.current +
-      " " +
-      (lastPartialRef.current || "")
-    )
-      .replace(/\s+/g, " ")
-      .trim()
-
-    if (finalTranscriptText) {
-      handleUserResponse(finalTranscriptText, undefined, audioUploadPromise)
-    }
-    transcriptRef.current = ""
-    lastPartialRef.current = ""
-    setLiveTranscript("")
-  }
-
-  const toggleRecording = () => {
-    if (isRecording) stopAndSubmit()
-    else startRecording()
-  }
-
-  const handleGenerateWithAi = async () => {
-    if (isAiStreaming) return
-
-    setIsAiStreaming(true)
-    setShowAiSuggestion(true)
-    setStreamedText("")
-    setIsThinking(false)
-
-    const currentAbortController = new AbortController()
-    abortControllerRef.current = currentAbortController
-
-    try {
-      const response = await fetch("/api/chat/stream", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          messages: messages,
-          candidateName: user?.name,
-          interviewerName: interviewer
-            ? `${interviewer.firstName} ${interviewer.lastName}`
-            : "Sarah Miller",
-          interviewType: session?.interview?.type,
-          jobTitle: session?.interview?.jobTitle,
-          jobDescription: session?.interview?.description,
-          sessionType: "interview",
-        }),
-        signal: currentAbortController.signal,
-      })
-
-      if (!response.ok) throw new Error("Streaming failed")
-
-      const reader = response.body?.getReader()
-      const decoder = new TextDecoder()
-      let accumulated = ""
-
-      if (reader) {
-        while (true) {
-          const { done, value } = await reader.read()
-          if (done) break
-          const chunk = decoder.decode(value)
-          accumulated += chunk
-          setStreamedText(accumulated)
-        }
-      }
-    } catch (error: unknown) {
-      if (error instanceof Error && error.name !== "AbortError") {
-        console.error("Streaming error:", error)
-      }
-    } finally {
-      setIsAiStreaming(false)
-    }
-  }
-
-  const handleCancelSuggestion = () => {
-    if (abortControllerRef.current) abortControllerRef.current.abort()
-    setIsAiStreaming(false)
-    setShowAiSuggestion(false)
-    setStreamedText("")
-  }
-
-  const handleOpenMicFromSuggestion = () => {
-    if (abortControllerRef.current) abortControllerRef.current.abort()
-    setIsAiStreaming(false)
-    startRecording()
-  }
-
-  const handleUserResponse = async (
-    text: string,
-    code?: string,
-    audioUploadPromise?: Promise<{
-      url: string | null
-      path: string | null
-    } | null>,
-  ) => {
-    const userMsg: Message = {
-      role: "user",
-      parts: [
-        {
-          type: "text" as const,
-          text,
-          speakerName: authSession?.user?.name || "Candidate",
-          speakerTitle: "Candidate",
-          isUsersTurn: false,
-          audio: { url: null, path: null },
-        },
-        ...(code
-          ? ([
-              {
-                type: "tool" as const,
-                name: "open_editor",
-                parameters: { code },
-              },
-            ] as MessagePart[])
-          : []),
-      ],
-    }
-    const newMessages: Message[] = [...messages, userMsg]
-    setMessages(newMessages)
-    setShowAiSuggestion(false)
-    setStreamedText("")
-
-    setIsThinking(true)
-    const aiData = await fetchAiResponse(newMessages, code)
-    if (aiData === "AbortError") return
-
-    if (aiData) {
-      // Background: Handle audio update if promise exists
-      if (audioUploadPromise && aiData.userMsgId) {
-        audioUploadPromise.then(async (result) => {
-          if (result?.url) {
-            try {
-              await fetch(`/api/messages/${aiData.userMsgId}`, {
-                method: "PATCH",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  audioUrl: result.url,
-                  audioPath: result.path,
-                }),
-              })
-
-              // Locally update messages to show audio if needed
-              setMessages((prev) =>
-                prev.map((m) => {
-                  if (
-                    m.id === aiData.userMsgId ||
-                    (m.role === "user" && m.parts)
-                  ) {
-                    const updatedParts = m.parts.map((p) => {
-                      if (p.type === "text") {
-                        return {
-                          ...p,
-                          audio: { url: result.url, path: result.path },
-                        }
-                      }
-                      return p
-                    })
-                    return { ...m, parts: updatedParts }
-                  }
-                  return m
-                }),
-              )
-            } catch (err) {
-              console.error("Error updating message audio in background:", err)
-            }
-          }
-        })
-      }
-
-      const assistantMsg: Message = {
-        role: "assistant",
-        parts: [
-          {
-            type: "text" as const,
-            text: aiData.text,
-            speakerName: aiData.speakerName,
-            speakerTitle: aiData.speakerTitle,
-            isUsersTurn: !!aiData.isUsersTurn,
-            audio: { url: aiData.audioUrl, path: aiData.audioPath },
-          },
-          ...(aiData.toolCalls
-            ? aiData.toolCalls.map((tc: MessagePart) => ({
-                type: "tool" as const,
-                name: (tc.name || tc.tool?.name || "") as string,
-                parameters: (tc.parameters ||
-                  tc.tool?.parameters ||
-                  {}) as Record<string, unknown>,
-              }))
-            : []),
-        ],
-      }
-      setMessages([...newMessages, assistantMsg])
-      setIsUsersTurn(!!aiData.isUsersTurn)
-      speak(
-        aiData.text,
-        aiData.isCompleted,
-        aiData.audioUrl,
-        !!aiData.isUsersTurn,
-      )
-    } else {
-      setIsThinking(false)
-      setIsUsersTurn(true) // Allow user to try again on error
-    }
-  }
 
   useEffect(() => {
     return () => stopAll()

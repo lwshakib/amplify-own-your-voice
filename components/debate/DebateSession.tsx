@@ -677,13 +677,31 @@ export default function DebateSession({
       if (!reader) throw new Error("No stream found")
 
       const decoder = new TextDecoder()
-      let result = ""
+      let buffer = ""
 
       while (true) {
         const { done, value } = await reader.read()
         if (done) break
-        result += decoder.decode(value, { stream: true })
-        setSuggestedText(result)
+
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split("\n")
+        buffer = lines.pop() || ""
+
+        for (const line of lines) {
+          const trimmed = line.trim()
+          if (!trimmed) continue
+          if (trimmed.startsWith("data: ")) {
+            const dataStr = trimmed.slice(6)
+            try {
+              const parsed = JSON.parse(dataStr)
+              if (parsed.type === "text" && parsed.content) {
+                setSuggestedText((prev) => prev + parsed.content)
+              }
+            } catch (err) {
+              // Ignore parsing errors
+            }
+          }
+        }
       }
     } catch (error) {
       console.error("Suggestion error:", error)

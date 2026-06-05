@@ -741,15 +741,32 @@ export default function AiPersonaSession({
 
       const reader = response.body?.getReader()
       const decoder = new TextDecoder()
-      let accumulated = ""
 
       if (reader) {
+        let buffer = ""
         while (true) {
           const { done, value } = await reader.read()
           if (done) break
-          const chunk = decoder.decode(value)
-          accumulated += chunk
-          setStreamedText(accumulated)
+
+          buffer += decoder.decode(value, { stream: true })
+          const lines = buffer.split("\n")
+          buffer = lines.pop() || ""
+
+          for (const line of lines) {
+            const trimmed = line.trim()
+            if (!trimmed) continue
+            if (trimmed.startsWith("data: ")) {
+              const dataStr = trimmed.slice(6)
+              try {
+                const parsed = JSON.parse(dataStr)
+                if (parsed.type === "text" && parsed.content) {
+                  setStreamedText((prev) => prev + parsed.content)
+                }
+              } catch (err) {
+                // Ignore parsing errors
+              }
+            }
+          }
         }
 
         // Removed: if (!isCancelled && accumulated) { handleSend(accumulated) }
