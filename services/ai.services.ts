@@ -8,6 +8,9 @@ import {
   GenerateAudioOptions,
   GenerateAudioResult,
 } from "@/types/ai"
+import { streamText } from "@/llm/streamText"
+import { generateText } from "@/llm/generateText"
+import { generateObject } from "@/llm/generateObject"
 
 /**
  * AIService Class
@@ -34,100 +37,9 @@ export class AIService {
    */
   async streamText(
     messages: { role: string; content: string }[],
-    options?: StreamTextOptions,
+    options?: StreamTextOptions | AbortSignal,
   ): Promise<ReadableStream> {
-    const { onFinish, abortSignal } = options || {}
-
-    const response = await fetch(this.gatewayUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${this.apiKey}`,
-      },
-      body: JSON.stringify({
-        model: CHAT_MODEL_ID,
-        messages: messages.map((m) => ({
-          role: m.role,
-          content: m.content,
-        })),
-        stream: true,
-      }),
-      signal: abortSignal,
-    })
-
-    if (!response.ok) {
-      throw new Error(`AI Gateway error: ${await response.text()}`)
-    }
-
-    const reader = response.body?.getReader()
-    const encoder = new TextEncoder()
-    const decoder = new TextDecoder()
-
-    return new ReadableStream({
-      async start(controller) {
-        if (!reader) {
-          controller.close()
-          return
-        }
-
-        let finalContent = ""
-        let finalReasoning = ""
-
-        try {
-          let lineBuffer = ""
-          while (true) {
-            const { done, value } = await reader.read()
-            if (done) break
-
-            lineBuffer += decoder.decode(value, { stream: true })
-            const lines = lineBuffer.split("\n")
-            lineBuffer = lines.pop() || ""
-
-            for (const line of lines) {
-              const trimmed = line.trim()
-              if (trimmed.startsWith("data: ") && trimmed !== "data: [DONE]") {
-                try {
-                  const data = JSON.parse(trimmed.slice(6))
-                  const delta = data.choices?.[0]?.delta
-
-                  if (delta?.reasoning_content) {
-                    finalReasoning += delta.reasoning_content
-                    controller.enqueue(
-                      encoder.encode(
-                        `data: ${JSON.stringify({ type: "reasoning", content: delta.reasoning_content })}\n\n`,
-                      ),
-                    )
-                  }
-
-                  if (delta?.content) {
-                    finalContent += delta.content
-                    controller.enqueue(
-                      encoder.encode(
-                        `data: ${JSON.stringify({ type: "text", content: delta.content })}\n\n`,
-                      ),
-                    )
-                  }
-                } catch (e) {
-                  console.error("Error parsing stream chunk:", e)
-                }
-              }
-            }
-          }
-        } catch (error: unknown) {
-          if ((error as Error).name === "AbortError") {
-            console.log("[AIService Stream] Aborted")
-          } else {
-            controller.error(error)
-          }
-        } finally {
-          if (onFinish) {
-            await onFinish({ content: finalContent, reasoning: finalReasoning })
-          }
-          reader.releaseLock()
-          controller.close()
-        }
-      },
-    })
+    return streamText(messages, options)
   }
 
   /**
@@ -137,71 +49,19 @@ export class AIService {
     messages: { role: string; content: string }[],
     options?: { temperature?: number; max_tokens?: number },
   ): Promise<string> {
-    const { temperature, max_tokens } = options || {}
-
-    const response = await fetch(this.gatewayUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${this.apiKey}`,
-      },
-      body: JSON.stringify({
-        model: CHAT_MODEL_ID,
-        messages,
-        temperature,
-        max_tokens,
-        stream: false,
-      }),
+    return generateText(messages, {
+      temperature: options?.temperature,
     })
-
-    if (!response.ok) {
-      throw new Error(`AI Gateway error: ${await response.text()}`)
-    }
-
-    const result = await response.json()
-    return result.choices?.[0]?.message?.content || ""
   }
 
   /**
    * Structured JSON Generation with sanitization.
    */
-  async generateObject<T>(
-    messages: { role: string; content: string }[],
-    outputSchema: any,
+  async generateObject<T = any>(
+    messagesOrParams: { role: string; content: string }[] | { messages: { role: string; content: string }[]; outputSchema: any },
+    outputSchema?: any,
   ): Promise<T> {
-    const response = await fetch(this.gatewayUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${this.apiKey}`,
-      },
-      body: JSON.stringify({
-        model: CHAT_MODEL_ID,
-        messages,
-        response_format: { type: "json_object" },
-      }),
-    })
-
-    if (!response.ok) {
-      throw new Error(`AI Gateway error: ${await response.text()}`)
-    }
-
-    const result = await response.json()
-    const content = result.choices?.[0]?.message?.content
-
-    if (!content) {
-      throw new Error("Failed to generate object: No content in response.")
-    }
-
-    try {
-      const cleanContent = this._sanitizeJSON(content)
-      return JSON.parse(cleanContent)
-    } catch (e) {
-      console.error("[AIService] JSON Parse Error. Content:", content)
-      throw new Error(
-        `Model returned invalid JSON: ${content.slice(0, 100)}...`,
-      )
-    }
+    return generateObject<T>(messagesOrParams, outputSchema)
   }
 
   /**
