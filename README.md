@@ -70,7 +70,7 @@ graph TD
 
 ### Prerequisites
 
-Ensure you have [Node.js](https://nodejs.org) and [Bun](https://bun.sh) installed.
+Ensure you have [Node.js](https://nodejs.org) and [pnpm](https://pnpm.io) installed.
 
 ### Installation
 
@@ -84,7 +84,7 @@ Ensure you have [Node.js](https://nodejs.org) and [Bun](https://bun.sh) installe
 2. **Install dependencies**:
 
    ```bash
-   bun install
+   pnpm install
    ```
 
 3. **Environment Setup**:
@@ -93,14 +93,14 @@ Ensure you have [Node.js](https://nodejs.org) and [Bun](https://bun.sh) installe
 4. **Database Setup**:
 
    ```bash
-   bun x prisma generate
-   bun x prisma db push
+   pnpm prisma generate
+   pnpm prisma db push
    ```
 
 5. **Run the development server**:
 
    ```bash
-   bun dev
+   pnpm dev
    ```
 
 6. Open [http://localhost:3000](http://localhost:3000) with your browser.

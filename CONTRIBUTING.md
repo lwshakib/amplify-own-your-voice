@@ -27,10 +27,10 @@ By participating in this project, you are expected to uphold our [Code of Conduc
 
 ### 2) Install Dependencies
 
-We use [Bun](https://bun.sh) for package management.
+We use [pnpm](https://pnpm.io) for package management.
 
 ```bash
-bun install
+pnpm install
 ```
 
 ### 3) Environment Variables
@@ -60,14 +60,14 @@ bun install
 ### 4) Database Initialization
 
 ```bash
-bun x prisma generate
-bun x prisma db push
+pnpm prisma generate
+pnpm prisma db push
 ```
 
 ### 5) Run Development Server
 
 ```bash
-bun dev
+pnpm dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000).
@@ -140,7 +140,7 @@ git push
 
 ## Style Guide
 
-- **Package Manager**: Always use `bun`.
+- **Package Manager**: Always use `pnpm`.
 - **Typing**: Use strict TypeScript typing; avoid `any`.
 - **UI**: Follow the design system using Tailwind CSS and Shadcn UI.
 - **State Management**: Prefer React Hooks and Context; use Zustand for complex global state.
