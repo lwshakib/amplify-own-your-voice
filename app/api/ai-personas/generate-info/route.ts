@@ -39,8 +39,8 @@ export async function POST(req: Request) {
       goal,
     })
 
-    const generatedInfo = await aiService.generateObject({
-      messages: [
+    const generatedInfo = await aiService.generateObject(
+      [
         {
           role: "system",
           content:
@@ -53,9 +53,8 @@ export async function POST(req: Request) {
             : `User's Goal: "${finalGoal}"`,
         },
       ],
-      outputSchema: PersonaInfoSchema,
-      signal: req.signal,
-    })
+      PersonaInfoSchema
+    )
 
     return NextResponse.json({
       name: generatedInfo.name,

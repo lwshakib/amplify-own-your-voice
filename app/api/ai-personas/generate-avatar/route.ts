@@ -1,4 +1,4 @@
-import { s3Service } from "@/services/s3.services"
+import { getSignedDownloadUrl } from "@/lib/s3"
 import { validateSession } from "@/lib/auth-utils"
 import { NextResponse } from "next/server"
 import { GenerateAvatarSchema } from "@/schemas/ai-persona"
@@ -46,12 +46,12 @@ export async function POST(req: Request) {
       height: 512,
     })
 
-    if (!("path" in imageResult)) {
+    if (!imageResult.success || !imageResult.path) {
       throw new Error(imageResult.error || "Image generation failed")
     }
 
     // Get a temporary signed URL for the frontend to display immediately
-    const signedUrl = await s3Service.getSignedDownloadUrl(imageResult.path)
+    const signedUrl = await getSignedDownloadUrl(imageResult.path)
 
     return NextResponse.json({
       path: imageResult.path,
