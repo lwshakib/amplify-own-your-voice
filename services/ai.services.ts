@@ -4,7 +4,7 @@ import {
   IMAGE_MODEL_ID,
   TTS_MODEL_ID,
 } from "@/lib/constants"
-import { s3Service } from "@/services/s3.services"
+import { uploadAsset } from "@/lib/s3"
 import {
   StreamTextOptions,
   GenerateImageOptions,
@@ -260,7 +260,7 @@ export class AIService {
       }
 
       const buffer = Buffer.from(result.image, "base64")
-      const upload = await s3Service.uploadAsset({
+      const upload = await uploadAsset({
         buffer,
         folder: "avatars",
         extension: "png",
@@ -334,7 +334,7 @@ export class AIService {
       throw new Error(result.error || "Audio generation failed")
     }
 
-    return await s3Service.uploadAsset({
+    return await uploadAsset({
       buffer: result.buffer,
       folder: "audio",
       extension: "mp3",
