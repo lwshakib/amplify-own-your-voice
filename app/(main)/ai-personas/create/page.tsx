@@ -79,14 +79,7 @@ export default function CreateCustomAgentPage() {
     path: string
   } | null>(null)
 
-  // Avatar Generation States
-  const [isGeneratingAvatar, setIsGeneratingAvatar] = useState(false)
-  const [showAvatarDialog, setShowAvatarDialog] = useState(false)
-  const [tempGeneratedAvatar, setTempGeneratedAvatar] = useState<{
-    url: string
-    path: string
-  } | null>(null)
-  const [customAvatarPrompt, setCustomAvatarPrompt] = useState("")
+
 
   const [suggestedPrompts, setSuggestedPrompts] = useState<string[]>([])
   const [generateAbortController, setGenerateAbortController] =
@@ -173,48 +166,6 @@ export default function CreateCustomAgentPage() {
     }
   }
 
-  const handleOpenAvatarDialog = () => {
-    if (!name || !aiPrompt || !instruction) {
-      toast.error("Please fill name, goal, and instructions first")
-      return
-    }
-    setTempGeneratedAvatar(null)
-    setCustomAvatarPrompt("")
-    setShowAvatarDialog(true)
-  }
-
-  /**
-   * AI Avatar Generation
-   * Uses the persona's identity to generate a relevant visual representation.
-   */
-  const handleGenerateAvatar = async () => {
-    setIsGeneratingAvatar(true)
-    setTempGeneratedAvatar(null)
-
-    try {
-      const response = await fetch("/api/ai-personas/generate-avatar", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name,
-          goal: aiPrompt,
-          instruction,
-          customPrompt: customAvatarPrompt,
-        }),
-      })
-
-      if (!response.ok) throw new Error("Avatar generation failed")
-
-      const data = await response.json()
-      // data contains { path, url } where url is a temporary signed AWS URL
-      setTempGeneratedAvatar(data)
-    } catch (error) {
-      console.error("Avatar Gen Error:", error)
-      toast.error("Failed to generate avatar")
-    } finally {
-      setIsGeneratingAvatar(false)
-    }
-  }
 
   /**
    * Magic Builder Logic
@@ -472,118 +423,8 @@ export default function CreateCustomAgentPage() {
               >
                 Active • Private
               </Badge>
-
-              {/* Dynamic Action: Image Generation flow */}
-              {name && aiPrompt && instruction && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="gap-2 mt-4"
-                  onClick={handleOpenAvatarDialog}
-                  disabled={isGeneratingAvatar}
-                >
-                  <IconPhoto className="size-4" />
-                  Generate Avatar
-                </Button>
-              )}
             </CardContent>
           </Card>
-
-          {/* AI Avatar Generation Dialog */}
-          <Dialog open={showAvatarDialog} onOpenChange={setShowAvatarDialog}>
-            <DialogContent className="sm:max-w-md p-0 overflow-hidden border-border bg-background shadow-2xl">
-              <div className="p-6 space-y-6">
-                <div className="space-y-1">
-                  {/* Context-aware title */}
-                  <DialogTitle className="text-xl font-bold tracking-tight">
-                    Generate avatar
-                  </DialogTitle>
-                  <p className="text-sm text-zinc-500">
-                    Define the visual identity for {name || "your agent"}.
-                  </p>
-                </div>
-
-                <div className="space-y-6">
-                  {/* Visual Preview Area during generation */}
-                  {(isGeneratingAvatar || tempGeneratedAvatar) && (
-                    <div className="flex justify-center">
-                      {isGeneratingAvatar ? (
-                        /* Loading Spinner with drafted state */
-                        <div className="size-48 rounded-lg bg-muted flex flex-col items-center justify-center gap-3 animate-pulse border border-border">
-                          <IconLoader2 className="size-8 animate-spin text-muted-foreground/40" />
-                          <span className="text-[10px] tracking-widest text-muted-foreground font-bold">
-                            DRAFTING...
-                          </span>
-                        </div>
-                      ) : (
-                        tempGeneratedAvatar && (
-                          /* Render generated result */
-                          <div className="size-48 rounded-lg overflow-hidden border border-border shadow-lg relative group">
-                            <Image
-                              src={tempGeneratedAvatar.url}
-                              fill
-                              className="object-cover"
-                              alt="Generated"
-                            />
-                          </div>
-                        )
-                      )}
-                    </div>
-                  )}
-
-                  {/* Prompt refinement for the image generator */}
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <Label
-                        htmlFor="customAvatarPrompt"
-                        className="text-xs text-muted-foreground"
-                      >
-                        Behavioral visual prompt (optional)
-                      </Label>
-                      <Input
-                        id="customAvatarPrompt"
-                        placeholder="e.g. Minimalist robot, purple neon, cyber-organic..."
-                        className="bg-muted/50 border-input h-10 text-sm focus-visible:ring-primary/20"
-                        value={customAvatarPrompt}
-                        onChange={(e) => setCustomAvatarPrompt(e.target.value)}
-                        disabled={isGeneratingAvatar}
-                      />
-                    </div>
-
-                    <Button
-                      className="w-full gap-2 font-semibold"
-                      onClick={handleGenerateAvatar}
-                      disabled={isGeneratingAvatar}
-                    >
-                      {tempGeneratedAvatar ? (
-                        <IconRefresh className="size-4" />
-                      ) : (
-                        <IconSparkles className="size-4" />
-                      )}
-                      {tempGeneratedAvatar
-                        ? "Regenerate avatar"
-                        : "Generate visuals"}
-                    </Button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Confirm Selection */}
-              {tempGeneratedAvatar && !isGeneratingAvatar && (
-                <div className="px-6 pb-6 pt-2 flex justify-end">
-                  <Button
-                    className="w-full sm:w-auto font-bold"
-                    onClick={() => {
-                      setAvatar(tempGeneratedAvatar)
-                      setShowAvatarDialog(false)
-                    }}
-                  >
-                    Apply avatar
-                  </Button>
-                </div>
-              )}
-            </DialogContent>
-          </Dialog>
 
           {/* Primary Save Action */}
           <Button

@@ -50,14 +50,7 @@ export function EditAiPersonaModal({
   } | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-  // Avatar Generation State
-  const [showAvatarDialog, setShowAvatarDialog] = useState(false)
-  const [isGeneratingAvatar, setIsGeneratingAvatar] = useState(false)
-  const [tempGeneratedAvatar, setTempGeneratedAvatar] = useState<{
-    url: string
-    path: string
-  } | null>(null)
-  const [customAvatarPrompt, setCustomAvatarPrompt] = useState("")
+
   const [isGeneratingInfo, setIsGeneratingInfo] = useState(false)
   const [goal, setGoal] = useState("")
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -96,40 +89,6 @@ export function EditAiPersonaModal({
     }
   }
 
-  const handleGenerateAvatar = async () => {
-    setIsGeneratingAvatar(true)
-    try {
-      const response = await fetch("/api/ai-personas/generate-avatar", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name,
-          goal,
-          instruction,
-          customPrompt: customAvatarPrompt,
-        }),
-      })
-
-      if (!response.ok) throw new Error("Generation failed")
-
-      const data = await response.json()
-      // data contains { path, url } where url is a temporary signed AWS URL
-      setTempGeneratedAvatar(data)
-      toast.success("New visual identity drafted!")
-    } catch (error) {
-      console.error("Avatar generation error:", error)
-      toast.error("Failed to generate avatar")
-    } finally {
-      setIsGeneratingAvatar(false)
-    }
-  }
-
-  const handleOpenAvatarDialog = () => {
-    setShowAvatarDialog(true)
-    if (!tempGeneratedAvatar && !isGeneratingAvatar) {
-      handleGenerateAvatar()
-    }
-  }
 
   const handleRefineInstructions = async () => {
     if (!goal) {
@@ -243,16 +202,6 @@ export function EditAiPersonaModal({
                     onChange={handleAvatarUpload}
                   />
 
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="gap-2 border-primary/20 bg-primary/5 text-primary hover:bg-primary/10 px-6"
-                    onClick={handleOpenAvatarDialog}
-                  >
-                    <IconSparkles className="size-4" />
-                    AI Visual Builder
-                  </Button>
                 </div>
 
                 {/* Form Fields */}
@@ -354,106 +303,6 @@ export function EditAiPersonaModal({
               </div>
             </div>
           </form>
-        </DialogContent>
-      </Dialog>
-
-      {/* Avatar Generation Dialog */}
-      <Dialog open={showAvatarDialog} onOpenChange={setShowAvatarDialog}>
-        <DialogContent className="max-w-md bg-zinc-950 border-zinc-900 p-0 overflow-hidden shadow-2xl">
-          <div className="p-8 space-y-8">
-            <div className="space-y-1">
-              <DialogTitle className="text-lg font-bold tracking-tight">
-                Generate Avatar
-              </DialogTitle>
-              <p className="text-xs text-zinc-500">
-                Define the visual identity for {name || "your agent"}.
-              </p>
-            </div>
-
-            <div className="space-y-6">
-              {/* Preview Area */}
-              {(isGeneratingAvatar || tempGeneratedAvatar) && (
-                <div className="flex justify-center py-2">
-                  {isGeneratingAvatar ? (
-                    <div className="size-40 rounded-3xl bg-zinc-950 border border-zinc-900 flex flex-col items-center justify-center gap-3 animate-pulse">
-                      <IconLoader2 className="size-8 animate-spin text-primary/40" />
-                      <span className="text-[10px] tracking-widest text-zinc-600 font-bold">
-                        Drafting...
-                      </span>
-                    </div>
-                  ) : (
-                    tempGeneratedAvatar && (
-                      <div className="size-40 rounded-3xl overflow-hidden border-2 border-primary/20 shadow-2xl relative group">
-                        <Image
-                          src={tempGeneratedAvatar.url}
-                          className="size-full object-cover"
-                          alt="Generated"
-                          width={160}
-                          height={160}
-                        />
-                        <div className="absolute inset-0 bg-primary/10 opacity-0 group-hover:opacity-100 transition-opacity" />
-                      </div>
-                    )
-                  )}
-                </div>
-              )}
-
-              {/* Persistent Prompt Field */}
-              <div className="space-y-3">
-                <div className="space-y-1.5">
-                  <Label
-                    htmlFor="customAvatarPrompt"
-                    className="text-[10px] font-bold tracking-[0.1em] text-zinc-500 ml-1"
-                  >
-                    Behavioral Visual Prompt{" "}
-                    <span className="text-[9px] font-medium opacity-50">
-                      (optional)
-                    </span>
-                  </Label>
-                  <Input
-                    id="customAvatarPrompt"
-                    placeholder="e.g. Minimalist robot, purple neon, cyber-organic..."
-                    className="bg-zinc-950 border-zinc-800 h-10 text-sm focus-visible:ring-primary/20"
-                    value={customAvatarPrompt}
-                    onChange={(e) => setCustomAvatarPrompt(e.target.value)}
-                    disabled={isGeneratingAvatar}
-                  />
-                </div>
-
-                <Button
-                  type="button"
-                  className="w-full h-10 gap-2 bg-primary hover:bg-primary/90 text-primary-foreground font-bold shadow-lg shadow-primary/10"
-                  onClick={handleGenerateAvatar}
-                  disabled={isGeneratingAvatar}
-                >
-                  {tempGeneratedAvatar ? (
-                    <IconRefresh className="size-4" />
-                  ) : (
-                    <IconSparkles className="size-4" />
-                  )}
-                  {tempGeneratedAvatar
-                    ? "Regenerate Identity"
-                    : "Generate Visuals"}
-                </Button>
-              </div>
-            </div>
-          </div>
-
-          {/* Action Footer */}
-          {tempGeneratedAvatar && !isGeneratingAvatar && (
-            <div className="bg-zinc-950/50 border-t border-zinc-900 p-4 flex justify-end">
-              <Button
-                className="rounded-full px-10 h-10 bg-white hover:bg-zinc-200 text-black font-bold text-[11px] tracking-wide"
-                onClick={() => {
-                  setAvatar(tempGeneratedAvatar)
-                  setShowAvatarDialog(false)
-                  setTempGeneratedAvatar(null)
-                }}
-              >
-                Finalize & Apply
-              </Button>
-            </div>
-          )}
         </DialogContent>
       </Dialog>
     </>
