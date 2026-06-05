@@ -73,7 +73,7 @@ export default function CreateCustomAgentPage() {
   const [name, setName] = useState("")
   const [instruction, setInstruction] = useState("")
   const [aiPrompt, setAiPrompt] = useState("") // User's high-level goal
-  const [characterId, setCharacterId] = useState<string>("sarah")
+  const [characterId, setCharacterId] = useState<string>("aoede")
   const [avatar, setAvatar] = useState<{
     url: string
     path: string

@@ -13,12 +13,48 @@ export function getPersonaBuilderPrompt(
 - **Example Behaviors**: Include 1-2 scenarios describing exactly how the persona would react.
 - **Constraints**: Explicitly forbid certain topics or styles if they conflict with the persona's core function.`
 
+  const voiceSelectionInstructions = `
+- **Voice Selection**: Recommend the best-fitting \`character_id\` that matches the gender, authority, and tone profile of the agent from the following 30 available voice character IDs:
+    - **Female Voices**:
+        - "aoede" (Celestial, song-like)
+        - "kore" (Spring, gentle)
+        - "leda" (Swan, calm)
+        - "callirrhoe" (Stream, flowing)
+        - "autonoe" (Mind, intelligent)
+        - "despina" (Nymph, active)
+        - "erinome" (Grace, elegant)
+        - "laomedeia" (Ruler, commanding)
+        - "schedar" (Queen, mature, authoritative)
+        - "pulcherrima" (Beauty, warm)
+        - "sadachbia" (Soothing, soft)
+        - "vindemiatrix" (Bright, energetic)
+        - "sulafat" (Lyra, melodic)
+    - **Male Voices**:
+        - "zephyr" (Breeze, light, friendly)
+        - "puck" (Mischief, playful, youthful)
+        - "charon" (Ferryman, deep, somber)
+        - "fenrir" (Wolf, strong, aggressive)
+        - "orus" (Falcon, sharp, clear)
+        - "enceladus" (Giant, massive, deep)
+        - "iapetus" (Titan, ancient, wise)
+        - "umbriel" (Shadow, mysterious, hushed)
+        - "algieba" (Lion, bold, proud)
+        - "algenib" (Pegasus, soaring, inspiring)
+        - "rasalgethi" (Kneeler, humble, helpful)
+        - "achernar" (River, smooth, steady)
+        - "alnilam" (Belt, professional, balanced)
+        - "gacrux" (Cross, sturdy, reliable)
+        - "achird" (Star, bright, crisp)
+        - "zubenelgenubi" (Warm, friendly)
+        - "sadaltager" (Confident, direct)
+`
+
   const outputInstruction = `
 ### OUTPUT FORMAT (CRITICAL):
 You MUST return a JSON object with exactly these keys:
 1. "name": The professional name for the agent (1-3 words).
 2. "instructions": A SINGLE STRING containing all the behavioral rules, tone, methodology, and character philosophy described above. Use markdown-like structure INSIDE this string for clarity.
-3. "character_id": (Optional) The ID of the best-fitting voice.
+3. "character_id": The ID of the best-fitting voice.
 `
 
   if (isRefining) {
@@ -34,6 +70,7 @@ Apply the user's refinement goal while upgrading the structural quality of the p
 ${baseRules}
 - **Precision**: Ensure the refined instructions are more actionable and less generic.
 - **Identity Integrity**: Maintain the core soul of the persona while focusing its utility.
+${voiceSelectionInstructions}
 
 ${outputInstruction}`
   }
@@ -48,7 +85,7 @@ Generate a professional Name and a comprehensive set of Instructions for this pe
 ${baseRules}
 - **Perspective**: The persona is a dedicated 1-on-1 partner. 
 - **Character Depth**: Give the persona a "philosophy" or a specific "mental model" they operate from.
-- **Voice Selection**: Recommend a character_id that matches the authority and tone.
+${voiceSelectionInstructions}
 
 ${outputInstruction}`
 }
