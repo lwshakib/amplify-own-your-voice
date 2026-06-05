@@ -1,4 +1,4 @@
-import { s3Service } from "@/services/s3.services"
+import { getSignedDownloadUrl } from "@/lib/s3"
 import { auth } from "@/lib/auth"
 import prisma from "@/lib/prisma"
 import { headers } from "next/headers"
@@ -53,7 +53,7 @@ export async function GET() {
       } | null
       if (avatar?.path) {
         try {
-          avatar.url = await s3Service.getSignedDownloadUrl(avatar.path)
+          avatar.url = await getSignedDownloadUrl(avatar.path)
         } catch (err) {
           console.error(`Failed to sign URL for agent ${agent.id}:`, err)
         }
