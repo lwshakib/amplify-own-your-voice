@@ -81,7 +81,9 @@ export function EditAiPersonaModal({
       const path = await uploadToS3Client(file, "avatars")
 
       // 2. Resolve to a temporary signed URL for local preview
-      const res = await fetch(`/api/s3/signed-url?path=${encodeURIComponent(path)}`)
+      const res = await fetch(
+        `/api/s3/signed-url?path=${encodeURIComponent(path)}`,
+      )
       const { url } = await res.json()
 
       setAvatar({ url, path })

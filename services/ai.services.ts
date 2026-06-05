@@ -1,9 +1,5 @@
 import * as env from "@/lib/env"
-import {
-  CHAT_MODEL_ID,
-  IMAGE_MODEL_ID,
-  TTS_MODEL_ID,
-} from "@/lib/constants"
+import { CHAT_MODEL_ID, IMAGE_MODEL_ID, TTS_MODEL_ID } from "@/lib/constants"
 import { uploadAsset } from "@/lib/s3"
 import {
   StreamTextOptions,
@@ -202,7 +198,9 @@ export class AIService {
       return JSON.parse(cleanContent)
     } catch (e) {
       console.error("[AIService] JSON Parse Error. Content:", content)
-      throw new Error(`Model returned invalid JSON: ${content.slice(0, 100)}...`)
+      throw new Error(
+        `Model returned invalid JSON: ${content.slice(0, 100)}...`,
+      )
     }
   }
 

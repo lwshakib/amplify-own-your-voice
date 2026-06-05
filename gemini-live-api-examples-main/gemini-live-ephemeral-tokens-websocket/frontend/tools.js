@@ -12,29 +12,29 @@ class ShowAlertTool extends FunctionCallDefinition {
         properties: {
           message: {
             type: "string",
-            description: "The message to display in the alert box"
+            description: "The message to display in the alert box",
           },
           title: {
             type: "string",
-            description: "Optional title prefix for the alert message"
-          }
-        }
+            description: "Optional title prefix for the alert message",
+          },
+        },
       },
-      ["message"]
-    );
+      ["message"],
+    )
   }
 
   functionToCall(parameters) {
-    const message = parameters.message || "Alert!";
-    const title = parameters.title;
+    const message = parameters.message || "Alert!"
+    const title = parameters.title
 
     // Construct the full alert message
-    const fullMessage = title ? `${title}: ${message}` : message;
+    const fullMessage = title ? `${title}: ${message}` : message
 
     // Show the alert
-    alert(fullMessage);
+    alert(fullMessage)
 
-    console.log(` Alert shown: ${fullMessage}`);
+    console.log(` Alert shown: ${fullMessage}`)
   }
 }
 /**
@@ -51,56 +51,62 @@ class AddCSSStyleTool extends FunctionCallDefinition {
         properties: {
           selector: {
             type: "string",
-            description: "CSS selector to target elements (e.g., 'body', '.class', '#id')"
+            description:
+              "CSS selector to target elements (e.g., 'body', '.class', '#id')",
           },
           property: {
             type: "string",
-            description: "CSS property to set (e.g., 'background-color', 'font-size', 'display')"
+            description:
+              "CSS property to set (e.g., 'background-color', 'font-size', 'display')",
           },
           value: {
             type: "string",
-            description: "Value for the CSS property (e.g., 'red', '20px', 'none')"
+            description:
+              "Value for the CSS property (e.g., 'red', '20px', 'none')",
           },
           styleId: {
             type: "string",
-            description: "Optional ID for the style element (for updating existing styles)"
-          }
-        }
+            description:
+              "Optional ID for the style element (for updating existing styles)",
+          },
+        },
       },
-      ["selector", "property", "value"]
-    );
+      ["selector", "property", "value"],
+    )
   }
 
   functionToCall(parameters) {
-    const { selector, property, value, styleId } = parameters;
+    const { selector, property, value, styleId } = parameters
 
     // Create or find the style element
-    let styleElement;
+    let styleElement
     if (styleId) {
-      styleElement = document.getElementById(styleId);
+      styleElement = document.getElementById(styleId)
       if (!styleElement) {
-        styleElement = document.createElement('style');
-        styleElement.id = styleId;
-        document.head.appendChild(styleElement);
+        styleElement = document.createElement("style")
+        styleElement.id = styleId
+        document.head.appendChild(styleElement)
       }
     } else {
-      styleElement = document.createElement('style');
-      document.head.appendChild(styleElement);
+      styleElement = document.createElement("style")
+      document.head.appendChild(styleElement)
     }
 
     // Create the CSS rule with !important
-    const cssRule = `${selector} { ${property}: ${value} !important; }`;
+    const cssRule = `${selector} { ${property}: ${value} !important; }`
 
     // Add the CSS rule to the style element
     if (styleId) {
       // If using an ID, replace the content
-      styleElement.textContent = cssRule;
+      styleElement.textContent = cssRule
     } else {
       // Otherwise append to any existing content
-      styleElement.textContent += cssRule;
+      styleElement.textContent += cssRule
     }
 
-    console.log(`🎨 CSS style injected: ${cssRule}`);
-    console.log(`   Applied to ${document.querySelectorAll(selector).length} element(s)`);
+    console.log(`🎨 CSS style injected: ${cssRule}`)
+    console.log(
+      `   Applied to ${document.querySelectorAll(selector).length} element(s)`,
+    )
   }
 }

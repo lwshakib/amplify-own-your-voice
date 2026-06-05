@@ -443,9 +443,9 @@ export default function InterviewSession({
                 speakerTitle: aiResponse.speakerTitle,
                 isUsersTurn: !!aiResponse.isUsersTurn,
                 audio: {
-                    path: aiResponse.audioPath,
-                    url: aiResponse.audioUrl || null,
-                  },
+                  path: aiResponse.audioPath,
+                  url: aiResponse.audioUrl || null,
+                },
               },
               ...(aiResponse.toolCalls
                 ? (aiResponse.toolCalls as MessagePart[]).map(
@@ -663,11 +663,13 @@ export default function InterviewSession({
         try {
           const { uploadToS3Client } = await import("@/lib/s3-client")
           const path = await uploadToS3Client(audioBlob, "user-recordings")
-          
+
           // Optionally get a temporary signed URL
-          const res = await fetch(`/api/s3/signed-url?path=${encodeURIComponent(path)}`)
+          const res = await fetch(
+            `/api/s3/signed-url?path=${encodeURIComponent(path)}`,
+          )
           const { url } = await res.json()
-          
+
           return { url, path } // Updated return type
         } catch (err) {
           console.error("Failed to upload user audio to S3:", err)

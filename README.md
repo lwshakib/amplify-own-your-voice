@@ -13,7 +13,6 @@
 
 Leveraging the precision of **Google Gemini** and the natural resonance of **Deepgram**, we bridge the gap between thought and expression, empowering you to truly **Own Your Voice**.
 
-
 ![Interview Session](./public/app_demo/01.png)
 ![Interview Session](./public/app_demo/02.png)
 ![Session Details](./public/app_demo/03.png)

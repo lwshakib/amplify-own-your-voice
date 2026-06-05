@@ -3,45 +3,45 @@
  */
 class GeminiClient {
   constructor(config) {
-    this.websocket = null;
-    this.onOpen = config.onOpen;
-    this.onMessage = config.onMessage;
-    this.onClose = config.onClose;
-    this.onError = config.onError;
+    this.websocket = null
+    this.onOpen = config.onOpen
+    this.onMessage = config.onMessage
+    this.onClose = config.onClose
+    this.onError = config.onError
   }
 
   connect() {
-    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const wsUrl = `${protocol}//${window.location.host}/ws`;
+    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:"
+    const wsUrl = `${protocol}//${window.location.host}/ws`
 
-    this.websocket = new WebSocket(wsUrl);
-    this.websocket.binaryType = "arraybuffer";
+    this.websocket = new WebSocket(wsUrl)
+    this.websocket.binaryType = "arraybuffer"
 
     this.websocket.onopen = () => {
-      if (this.onOpen) this.onOpen();
-    };
+      if (this.onOpen) this.onOpen()
+    }
 
     this.websocket.onmessage = (event) => {
-      if (this.onMessage) this.onMessage(event);
-    };
+      if (this.onMessage) this.onMessage(event)
+    }
 
     this.websocket.onclose = (event) => {
-      if (this.onClose) this.onClose(event);
-    };
+      if (this.onClose) this.onClose(event)
+    }
 
     this.websocket.onerror = (event) => {
-      if (this.onError) this.onError(event);
-    };
+      if (this.onError) this.onError(event)
+    }
   }
 
   send(data) {
     if (this.websocket && this.websocket.readyState === WebSocket.OPEN) {
-      this.websocket.send(data);
+      this.websocket.send(data)
     }
   }
 
   sendText(text) {
-    this.send(JSON.stringify({ text: text }));
+    this.send(JSON.stringify({ text: text }))
   }
 
   sendImage(base64Data, mimeType = "image/jpeg") {
@@ -50,18 +50,18 @@ class GeminiClient {
         type: "image",
         mime_type: mimeType,
         data: base64Data,
-      })
-    );
+      }),
+    )
   }
 
   disconnect() {
     if (this.websocket) {
-      this.websocket.close();
-      this.websocket = null;
+      this.websocket.close()
+      this.websocket = null
     }
   }
 
   isConnected() {
-    return this.websocket && this.websocket.readyState === WebSocket.OPEN;
+    return this.websocket && this.websocket.readyState === WebSocket.OPEN
   }
 }

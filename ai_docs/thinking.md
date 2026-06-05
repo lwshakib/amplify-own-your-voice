@@ -373,12 +373,12 @@ lets you control reasoning behavior.
 
 The following table details the `thinkingLevel` settings for each model type:
 
-| Thinking Level | Gemini 3.1 Pro | Gemini 3.1 Flash-Lite | Gemini 3 Flash | Gemini 3.5 Flash | Description |
-|---|---|---|---|---|---|
-| **`minimal`** | Not supported | Supported (Default) | Supported | Supported | Matches the "no thinking" setting for most queries. The model may think very minimally for complex coding tasks. Minimizes latency for chat or high throughput applications. Note, `minimal` does not guarantee that thinking is off. |
-| **`low`** | Supported | Supported | Supported | Supported | Minimizes latency and cost. Best for simple instruction following, chat, or high-throughput applications. |
-| **`medium`** | Supported | Supported | Supported | Supported (Default) | Balanced thinking for most tasks. |
-| **`high`** | Supported (Default, Dynamic) | Supported (Dynamic) | Supported (Default, Dynamic) | Supported (Dynamic) | Maximizes reasoning depth. The model may take significantly longer to reach a first (non thinking) output token, but the output will be more carefully reasoned. |
+| Thinking Level | Gemini 3.1 Pro               | Gemini 3.1 Flash-Lite | Gemini 3 Flash               | Gemini 3.5 Flash    | Description                                                                                                                                                                                                                           |
+| -------------- | ---------------------------- | --------------------- | ---------------------------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **`minimal`**  | Not supported                | Supported (Default)   | Supported                    | Supported           | Matches the "no thinking" setting for most queries. The model may think very minimally for complex coding tasks. Minimizes latency for chat or high throughput applications. Note, `minimal` does not guarantee that thinking is off. |
+| **`low`**      | Supported                    | Supported             | Supported                    | Supported           | Minimizes latency and cost. Best for simple instruction following, chat, or high-throughput applications.                                                                                                                             |
+| **`medium`**   | Supported                    | Supported             | Supported                    | Supported (Default) | Balanced thinking for most tasks.                                                                                                                                                                                                     |
+| **`high`**     | Supported (Default, Dynamic) | Supported (Dynamic)   | Supported (Default, Dynamic) | Supported (Dynamic) | Maximizes reasoning depth. The model may take significantly longer to reach a first (non thinking) output token, but the output will be more carefully reasoned.                                                                      |
 
 The following example shows how to set the thinking level.
 
@@ -498,15 +498,15 @@ Setting the `thinkingBudget` to -1 turns
 on **dynamic thinking**, meaning the model will adjust the budget based on the
 complexity of the request.
 
-| Model | Default setting (Thinking budget is not set) | Range | Disable thinking | Turn on dynamic thinking |
-|---|---|---|---|---|
-| **2.5 Pro** | Dynamic thinking | `128` to `32768` | N/A: Cannot disable thinking | `thinkingBudget = -1` (Default) |
-| **2.5 Flash** | Dynamic thinking | `0` to `24576` | `thinkingBudget = 0` | `thinkingBudget = -1` (Default) |
-| **2.5 Flash Preview** | Dynamic thinking | `0` to `24576` | `thinkingBudget = 0` | `thinkingBudget = -1` (Default) |
-| **2.5 Flash Lite** | Model does not think | `512` to `24576` | `thinkingBudget = 0` | `thinkingBudget = -1` |
-| **2.5 Flash Lite Preview** | Model does not think | `512` to `24576` | `thinkingBudget = 0` | `thinkingBudget = -1` |
-| **Robotics-ER 1.6 Preview** | Dynamic thinking | `0` to `24576` | `thinkingBudget = 0` | `thinkingBudget = -1` (Default) |
-| **2.5 Flash Live Native Audio Preview (09-2025)** | Dynamic thinking | `0` to `24576` | `thinkingBudget = 0` | `thinkingBudget = -1` (Default) |
+| Model                                             | Default setting (Thinking budget is not set) | Range            | Disable thinking             | Turn on dynamic thinking        |
+| ------------------------------------------------- | -------------------------------------------- | ---------------- | ---------------------------- | ------------------------------- |
+| **2.5 Pro**                                       | Dynamic thinking                             | `128` to `32768` | N/A: Cannot disable thinking | `thinkingBudget = -1` (Default) |
+| **2.5 Flash**                                     | Dynamic thinking                             | `0` to `24576`   | `thinkingBudget = 0`         | `thinkingBudget = -1` (Default) |
+| **2.5 Flash Preview**                             | Dynamic thinking                             | `0` to `24576`   | `thinkingBudget = 0`         | `thinkingBudget = -1` (Default) |
+| **2.5 Flash Lite**                                | Model does not think                         | `512` to `24576` | `thinkingBudget = 0`         | `thinkingBudget = -1`           |
+| **2.5 Flash Lite Preview**                        | Model does not think                         | `512` to `24576` | `thinkingBudget = 0`         | `thinkingBudget = -1`           |
+| **Robotics-ER 1.6 Preview**                       | Dynamic thinking                             | `0` to `24576`   | `thinkingBudget = 0`         | `thinkingBudget = -1` (Default) |
+| **2.5 Flash Live Native Audio Preview (09-2025)** | Dynamic thinking                             | `0` to `24576`   | `thinkingBudget = 0`         | `thinkingBudget = -1` (Default) |
 
 ### Python
 
@@ -629,7 +629,7 @@ Gemini returns thought signatures, which are encrypted representations of the
 model's internal thought process.
 
 - **Gemini 2.5 models** return thought signatures when thinking is enabled and the request includes [function calling](https://ai.google.dev/gemini-api/docs/function-calling#thinking), specifically [function declarations](https://ai.google.dev/gemini-api/docs/function-calling#step-2).
-- **Gemini 3 models** may return thought signatures for all types of [parts](https://ai.google.dev/api/caching#Part). We recommend you always pass all signatures back as received, but it's *required* for function calling signatures. Read the [Thought Signatures](https://ai.google.dev/gemini-api/docs/thought-signatures) page to learn more.
+- **Gemini 3 models** may return thought signatures for all types of [parts](https://ai.google.dev/api/caching#Part). We recommend you always pass all signatures back as received, but it's _required_ for function calling signatures. Read the [Thought Signatures](https://ai.google.dev/gemini-api/docs/thought-signatures) page to learn more.
 
 Other usage limitations to consider with function calling include:
 
@@ -721,12 +721,10 @@ You can try examples of using tools with thinking models in the
 
 \[Colab\]: https://colab.sandbox.google.com/github/google-gemini/cookbook/blob/main/quickstarts/Get_started_thinking.ipynb
 
-
-
 > [!IMPORTANT]
 > **Important:** **Thought signatures are handled automatically** when you use the official [Google Gen AI SDKs](https://ai.google.dev/gemini-api/docs/libraries) and append the full model response object directly to history. **You
-> only need to work with thought signatures directly when using the REST API** , or if you are *manually extracting and returning parts history in multi-turn
-> conversations*.
+> only need to work with thought signatures directly when using the REST API** , or if you are _manually extracting and returning parts history in multi-turn
+> conversations_.
 
 Thought signatures are encrypted representations of the model's internal thought
 process and are used to preserve reasoning context across multi-step
@@ -754,8 +752,8 @@ part of a larger process to complete a turn.
 
 ![Function calling turns and steps diagram](https://ai.google.dev/static/gemini-api/docs/images/fc-turns.png)
 
-*This document focuses on handling function calling for Gemini 3 models. Refer
-to the [model behavior](https://ai.google.dev/gemini-api/docs/thought-signatures#model-behavior) section for discrepancies with 2.5.*
+_This document focuses on handling function calling for Gemini 3 models. Refer
+to the [model behavior](https://ai.google.dev/gemini-api/docs/thought-signatures#model-behavior) section for discrepancies with 2.5._
 
 Gemini 3 returns thought signatures for all model responses (responses from
 the API) with a function call. Thought signatures show up in the following
@@ -791,8 +789,8 @@ to process the tool's output correctly in the next turn.
   - If you omit a `thought_signature` for the first `functionCall` part in any step of the current turn, the request will fail with a 400 error.
 - **If proper signatures are not returned, here is how you will error out**
   - Gemini 3 models: Failure to include signatures will result in a 400 error. The verbiage will be of the form:
-    - Function call `<Function Call>` in the `<index of contents array>` content block is missing a `thought_signature`. For example, *Function
-      call `FC1` in the `1.` content block is missing a `thought_signature`.*
+    - Function call `<Function Call>` in the `<index of contents array>` content block is missing a `thought_signature`. For example, _Function
+      call `FC1` in the `1.` content block is missing a `thought_signature`._
 
 ### Sequential function calling example
 
@@ -1018,10 +1016,10 @@ confirmation, we must include signatures for **ALL** function calls in this loop
 Let's walk through a parallel function calling example where the users asks
 `"Check weather in Paris and London"` to see where the model does validation.
 
-| **Turn** | **Step** | **User Request** | **Model Response** | **FunctionResponse** |
-|---|---|---|---|---|
-| 1 | 1 | `request1="Check the weather in Paris and London"` | FC1 ("Paris") + signature FC2 ("London") | FR1 |
-| 1 | 2 | `request 2 = request1 + FC1 ("Paris") + signature + FC2 ("London")` | text_output (no FCs) | None |
+| **Turn** | **Step** | **User Request**                                                    | **Model Response**                       | **FunctionResponse** |
+| -------- | -------- | ------------------------------------------------------------------- | ---------------------------------------- | -------------------- |
+| 1        | 1        | `request1="Check the weather in Paris and London"`                  | FC1 ("Paris") + signature FC2 ("London") | FR1                  |
+| 1        | 2        | `request 2 = request1 + FC1 ("Paris") + signature + FC2 ("London")` | text_output (no FCs)                     | None                 |
 
 The following code illustrates the sequence in the above table.
 
@@ -1173,7 +1171,7 @@ in non-function-call parts.
     [
       { "role": "user", "parts": [{ "text": "What is the risk?" }] },
       {
-        "role": "model", 
+        "role": "model",
         "parts": [
           {
             "text": "I need to calculate the risk. Let me think step-by-step...",
@@ -1332,7 +1330,7 @@ still in Turn 1 and must preserve `<Signature_A>`.
           "role": "tool",
           "name": "check_flight",
           "tool_call_id": "function-call-1",
-          "content": "{\"status\":\"delayed\",\"departure_time\":\"12 PM\"}"                 
+          "content": "{\"status\":\"delayed\",\"departure_time\":\"12 PM\"}"
         }
       ]
 
@@ -1391,7 +1389,7 @@ function calls in this loop (`<Signature A>` + `<Signature B>`).
           "role": "tool",
           "name": "check_flight",
           "tool_call_id": "function-call-1d6a1a61-6f4f-4029-80ce-61586bd86da5",
-          "content": "{\"status\":\"delayed\",\"departure_time\":\"12 PM\"}"                 
+          "content": "{\"status\":\"delayed\",\"departure_time\":\"12 PM\"}"
         },
         {
           "role": "model",
@@ -1538,7 +1536,7 @@ You must preserve `<Signature_A>` on the first part exactly as received.
           "name": "get_current_temperature",
           "tool_call_id": "function-call-f3b9ecb3-d55f-4076-98c8-b13e9d1c0e01",
           "content": "{\"temp\":\"15C\"}"
-        },    
+        },
         {
           "role":"tool",
           "name": "get_current_temperature",
@@ -1562,6 +1560,7 @@ You must preserve `<Signature_A>` on the first part exactly as received.
    dummy signatures of either `"context_engineering_is_the_way_to_go"` or
    `"skip_thought_signature_validator"` in the thought signature field to skip
    validation.
+
 2. **I am sending back interleaved parallel function calls and responses and the
    API is returning a 400. Why?**
 
@@ -1569,6 +1568,7 @@ You must preserve `<Signature_A>` on the first part exactly as received.
    user response expected is "FC1+ signature, FC2, FR1, FR2". If you have them
    interleaved as "FC1 + signature, FR1, FC2, FR2" the API will return a 400
    error.
+
 3. **When streaming and the model is not returning a function call I can't find
    the thought signature**
 

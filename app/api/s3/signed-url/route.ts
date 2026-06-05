@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { getSignedDownloadUrl } from '@/lib/s3';
-import { auth } from '@/lib/auth';
-import { headers } from 'next/headers';
+import { NextRequest, NextResponse } from "next/server"
+import { getSignedDownloadUrl } from "@/lib/s3"
+import { auth } from "@/lib/auth"
+import { headers } from "next/headers"
 
 /**
  * Handles the generation of signed GET URLs for viewing/streaming private assets.
@@ -9,24 +9,30 @@ import { headers } from 'next/headers';
 export async function GET(req: NextRequest) {
   const session = await auth.api.getSession({
     headers: await headers(),
-  });
+  })
 
   if (!session) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
   try {
-    const path = req.nextUrl.searchParams.get('path');
+    const path = req.nextUrl.searchParams.get("path")
 
     if (!path) {
-      return NextResponse.json({ error: 'Missing object path' }, { status: 400 });
+      return NextResponse.json(
+        { error: "Missing object path" },
+        { status: 400 },
+      )
     }
 
-    const url = await getSignedDownloadUrl(path);
+    const url = await getSignedDownloadUrl(path)
 
-    return NextResponse.json({ url });
+    return NextResponse.json({ url })
   } catch (error: any) {
-    console.error('[S3 Signed URL Error]', error);
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    console.error("[S3 Signed URL Error]", error)
+    return NextResponse.json(
+      { error: "Internal Server Error" },
+      { status: 500 },
+    )
   }
 }

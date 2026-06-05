@@ -10,7 +10,6 @@ import { getFeatureLogic } from "@/features/registry"
 import { MessagePart } from "@/features/types"
 import { z } from "zod"
 
-
 interface ChatMessage {
   role: "user" | "assistant" | "system"
   parts?: string | MessagePart[]
@@ -27,8 +26,7 @@ export async function POST(
     const { session, errorResponse } = await validateSession()
     if (errorResponse) return errorResponse
 
-    const { messages, code, duration, audioUrl, audioPath } =
-      await req.json()
+    const { messages, code, duration, audioUrl, audioPath } = await req.json()
 
     const interaction = await prisma.agentInteraction.findUnique({
       where: {
@@ -192,7 +190,10 @@ export async function POST(
     )
     if (textPart) {
       try {
-        const audioData = await aiService.textToSpeech(textPart.text || "", model)
+        const audioData = await aiService.textToSpeech(
+          textPart.text || "",
+          model,
+        )
         const signedUrl = await getSignedDownloadUrl(audioData.path)
 
         textPart.audio = {

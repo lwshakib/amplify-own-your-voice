@@ -52,28 +52,28 @@ open http://localhost:8000
 
 ```javascript
 // Connect using an ephemeral token
-const client = new GeminiLiveAPI(token, model);
-client.addFunction(toolInstance); // Add custom tools
-await client.connect(); // Establish direct WebSocket
-client.sendTextMessage("Hello"); // Send text
-client.sendAudioMessage(base64); // Send audio
-client.sendImageMessage(base64); // Send image
+const client = new GeminiLiveAPI(token, model)
+client.addFunction(toolInstance) // Add custom tools
+await client.connect() // Establish direct WebSocket
+client.sendTextMessage("Hello") // Send text
+client.sendAudioMessage(base64) // Send audio
+client.sendImageMessage(base64) // Send image
 ```
 
 ### Media Streaming
 
 ```javascript
 // Audio streaming
-const audioStreamer = new AudioStreamer(client);
-await audioStreamer.start(deviceId); 
+const audioStreamer = new AudioStreamer(client)
+await audioStreamer.start(deviceId)
 
 // Video streaming
-const videoStreamer = new VideoStreamer(client);
-await videoStreamer.start({ fps: 1, width: 640, height: 480 });
+const videoStreamer = new VideoStreamer(client)
+await videoStreamer.start({ fps: 1, width: 640, height: 480 })
 
 // Audio playback
-const player = new AudioPlayer();
-await player.play(base64PCM);
+const player = new AudioPlayer()
+await player.play(base64PCM)
 ```
 
 ### Custom Tools
@@ -81,7 +81,7 @@ await player.play(base64PCM);
 ```javascript
 class MyTool extends FunctionCallDefinition {
   constructor() {
-    super("tool_name", "description", parameters, required);
+    super("tool_name", "description", parameters, required)
   }
 
   functionToCall(params) {

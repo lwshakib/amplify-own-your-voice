@@ -360,10 +360,10 @@ export default function DebateSession({
             speakerName: aiResponse.speakerName,
             speakerTitle: aiResponse.speakerTitle,
             isUsersTurn: !!aiResponse.isUsersTurn,
-              audio: {
-                url: aiResponse.audioUrl,
-                path: aiResponse.audioPath,
-              },
+            audio: {
+              url: aiResponse.audioUrl,
+              path: aiResponse.audioPath,
+            },
           },
           ...(aiResponse.toolCalls
             ? aiResponse.toolCalls.map((tc: MessagePart) => ({
@@ -861,11 +861,13 @@ export default function DebateSession({
         try {
           const { uploadToS3Client } = await import("@/lib/s3-client")
           const path = await uploadToS3Client(audioBlob, "user-recordings")
-          
+
           // Get a signed URL for immediate playback
-          const res = await fetch(`/api/s3/signed-url?path=${encodeURIComponent(path)}`)
+          const res = await fetch(
+            `/api/s3/signed-url?path=${encodeURIComponent(path)}`,
+          )
           const { url } = await res.json()
-          
+
           return { url, path }
         } catch (err) {
           console.error("Failed to upload user audio to S3:", err)

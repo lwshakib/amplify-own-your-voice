@@ -387,7 +387,7 @@ Gemini 3 lets you combine Structured Outputs with built-in tools, including
                 {"url_context": {}}
             ],
             "response_format": {"text": {"mime_type": "application/json", "schema": MatchResult.model_json_schema()}},
-        },  
+        },
     )
 
     result = MatchResult.model_validate_json(response.text)
@@ -515,28 +515,28 @@ These descriptive properties help guide the model:
 
 The following models support structured output:
 
-| Model | Structured Outputs |
-|---|---|
-| Gemini 3.1 Flash-Lite | ✔️ |
-| Gemini 3.1 Pro Preview | ✔️ |
-| Gemini 3.5 Flash | ✔️ |
-| Gemini 3.1 Flash-Lite Preview | ✔️ |
-| Gemini 2.5 Pro | ✔️ |
-| Gemini 2.5 Flash | ✔️ |
-| Gemini 2.5 Flash-Lite | ✔️ |
-| Gemini 2.0 Flash | ✔️\* |
-| Gemini 2.0 Flash-Lite | ✔️\* |
+| Model                         | Structured Outputs |
+| ----------------------------- | ------------------ |
+| Gemini 3.1 Flash-Lite         | ✔️                 |
+| Gemini 3.1 Pro Preview        | ✔️                 |
+| Gemini 3.5 Flash              | ✔️                 |
+| Gemini 3.1 Flash-Lite Preview | ✔️                 |
+| Gemini 2.5 Pro                | ✔️                 |
+| Gemini 2.5 Flash              | ✔️                 |
+| Gemini 2.5 Flash-Lite         | ✔️                 |
+| Gemini 2.0 Flash              | ✔️\*               |
+| Gemini 2.0 Flash-Lite         | ✔️\*               |
 
-*\* Note that Gemini 2.0 requires an explicit `propertyOrdering` list within the JSON input to define the preferred structure. You can find an example in this [cookbook](https://github.com/google-gemini/cookbook/blob/main/examples/Pdf_structured_outputs_on_invoices_and_forms.ipynb).*
+_\* Note that Gemini 2.0 requires an explicit `propertyOrdering` list within the JSON input to define the preferred structure. You can find an example in this [cookbook](https://github.com/google-gemini/cookbook/blob/main/examples/Pdf_structured_outputs_on_invoices_and_forms.ipynb)._
 
 ## Structured outputs vs. function calling
 
 Both structured outputs and function calling use JSON schemas, but they serve different purposes:
 
-| Feature | Primary Use Case |
-|---|---|
-| **Structured Outputs** | **Formatting the final response to the user.** Use this when you want the model's *answer* to be in a specific format (e.g., extracting data from a document to save to a database). |
-| **Function Calling** | **Taking action during the conversation.** Use this when the model needs to *ask you* to perform a task (e.g., "get current weather") before it can provide a final answer. |
+| Feature                | Primary Use Case                                                                                                                                                                     |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Structured Outputs** | **Formatting the final response to the user.** Use this when you want the model's _answer_ to be in a specific format (e.g., extracting data from a document to save to a database). |
+| **Function Calling**   | **Taking action during the conversation.** Use this when the model needs to _ask you_ to perform a task (e.g., "get current weather") before it can provide a final answer.          |
 
 ## Best practices
 

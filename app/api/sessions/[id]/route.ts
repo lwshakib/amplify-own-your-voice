@@ -58,26 +58,29 @@ export async function GET(
       AI_PERSONA: "ai-persona",
     }
 
-
     // Resolve paths to signed URLs for all messages
-    const processedMessages = await Promise.all((interaction.messages || []).map(async (msg) => {
-      const parts = (msg.parts as unknown as MessagePart[]) || []
-      const processedParts = await Promise.all(parts.map(async (part) => {
-        if (part.audio?.path) {
-          try {
-            const signedUrl = await getSignedDownloadUrl(part.audio.path)
-            return {
-              ...part,
-              audio: { ...part.audio, url: signedUrl }
+    const processedMessages = await Promise.all(
+      (interaction.messages || []).map(async (msg) => {
+        const parts = (msg.parts as unknown as MessagePart[]) || []
+        const processedParts = await Promise.all(
+          parts.map(async (part) => {
+            if (part.audio?.path) {
+              try {
+                const signedUrl = await getSignedDownloadUrl(part.audio.path)
+                return {
+                  ...part,
+                  audio: { ...part.audio, url: signedUrl },
+                }
+              } catch (err) {
+                console.error(`Failed to sign URL for ${part.audio.path}:`, err)
+              }
             }
-          } catch (err) {
-            console.error(`Failed to sign URL for ${part.audio.path}:`, err)
-          }
-        }
-        return part
-      }))
-      return { ...msg, parts: processedParts }
-    }))
+            return part
+          }),
+        )
+        return { ...msg, parts: processedParts }
+      }),
+    )
 
     // Also resolve Persona avatar if it exists
     let processedAiPersona = interaction.aiPersona
@@ -88,7 +91,7 @@ export async function GET(
           const signedUrl = await getSignedDownloadUrl(avatar.path)
           processedAiPersona = {
             ...processedAiPersona,
-            avatar: { ...avatar, url: signedUrl }
+            avatar: { ...avatar, url: signedUrl },
           }
         } catch (err) {
           console.error(`Failed to sign Persona avatar URL:`, err)

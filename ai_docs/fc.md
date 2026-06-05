@@ -195,7 +195,7 @@ model, and external functions. Here's a breakdown of the process:
 
 1. **Define function declaration:** Define the function declaration in your application code. Function Declarations describe the function's name, parameters, and purpose to the model.
 2. **Call API with function declarations:** Send user prompt along with the function declaration(s) to the model. It analyzes the request and determines if a function call would be helpful. If so, it responds with a structured JSON object containing the function name, arguments, and a unique `id` (this `id` is now always returned by the API for Gemini 3 models^\*^).
-3. **Execute function code (your responsibility):** The Model *doesn't* execute the function itself. It's your application's responsibility to process the response and check for a function call. If
+3. **Execute function code (your responsibility):** The Model _doesn't_ execute the function itself. It's your application's responsibility to process the response and check for a function call. If
    - **Yes** : Extract the name, args, and `id` of the function and execute the corresponding function in your application.
    - **No:** The model has provided a direct text response to the prompt (this flow is less emphasized in the example but is a possible outcome).
 4. **Create user friendly response:** If a function was executed, capture the result and send it back to the model, ensuring you include the matching `id`, in a subsequent turn of the conversation. It will use the result to generate a final, user-friendly response that incorporates the information from the function call.
@@ -1067,7 +1067,7 @@ the.`function_calling_config`.
 - `VALIDATED`: Default mode for tool combination (when built-in tools or structured outputs also enabled). The model is constrained to predict either function calls or natural language, and ensures function schema adherence. If `allowed_function_names` is not provided, the model picks from all of the available function declarations. If `allowed_function_names` is provided, the model picks from the set of allowed functions. This mode reduces malformed function calls (compared to `AUTO` mode).
 - `AUTO`: Default mode when only function_declarations tool enabled. The model decides whether to generate a natural language response or suggest a function call based on the prompt and context.
 - `ANY`: The model is constrained to always predict a function call and ensures function schema adherence. If `allowed_function_names` is not specified, the model can choose from any of the provided function declarations. If `allowed_function_names` is provided as a list, the model can only choose from the functions in that list. Use this mode when you require a function call response to every prompt (if applicable).
-- `NONE`: The model is *prohibited* from making function calls. This is
+- `NONE`: The model is _prohibited_ from making function calls. This is
   equivalent to sending a request without any function declarations. Use this to
   temporarily disable function calling without removing your tool definitions.
 
@@ -1764,14 +1764,14 @@ This section lists models and their function calling capabilities. Experimental
 models are not included. You can find a comprehensive capabilities overview on
 the [model overview](https://ai.google.dev/gemini-api/docs/models) page.
 
-| Model | Function calling | Parallel function calling | Compositional function calling |
-|---|---|---|---|
-| [Gemini 3.1 Pro Preview](https://ai.google.dev/gemini-api/docs/models/gemini-3.1-pro-preview) | ✔️ | ✔️ | ✔️ |
-| [Gemini 3.1 Flash-Lite](https://ai.google.dev/gemini-api/docs/models/gemini-3.1-flash-lite) | ✔️ | ✔️ | ✔️ |
-| [Gemini 3.5 Flash](https://ai.google.dev/gemini-api/docs/models/gemini-3.5-flash) | ✔️ | ✔️ | ✔️ |
-| [Gemini 2.5 Pro](https://ai.google.dev/gemini-api/docs/models/gemini-2.5-pro) | ✔️ | ✔️ | ✔️ |
-| [Gemini 2.5 Flash](https://ai.google.dev/gemini-api/docs/models/gemini-2.5-flash) | ✔️ | ✔️ | ✔️ |
-| [Gemini 2.5 Flash-Lite](https://ai.google.dev/gemini-api/docs/models/gemini-2.5-flash-lite) | ✔️ | ✔️ | ✔️ |
+| Model                                                                                         | Function calling | Parallel function calling | Compositional function calling |
+| --------------------------------------------------------------------------------------------- | ---------------- | ------------------------- | ------------------------------ |
+| [Gemini 3.1 Pro Preview](https://ai.google.dev/gemini-api/docs/models/gemini-3.1-pro-preview) | ✔️               | ✔️                        | ✔️                             |
+| [Gemini 3.1 Flash-Lite](https://ai.google.dev/gemini-api/docs/models/gemini-3.1-flash-lite)   | ✔️               | ✔️                        | ✔️                             |
+| [Gemini 3.5 Flash](https://ai.google.dev/gemini-api/docs/models/gemini-3.5-flash)             | ✔️               | ✔️                        | ✔️                             |
+| [Gemini 2.5 Pro](https://ai.google.dev/gemini-api/docs/models/gemini-2.5-pro)                 | ✔️               | ✔️                        | ✔️                             |
+| [Gemini 2.5 Flash](https://ai.google.dev/gemini-api/docs/models/gemini-2.5-flash)             | ✔️               | ✔️                        | ✔️                             |
+| [Gemini 2.5 Flash-Lite](https://ai.google.dev/gemini-api/docs/models/gemini-2.5-flash-lite)   | ✔️               | ✔️                        | ✔️                             |
 
 ## Best practices
 

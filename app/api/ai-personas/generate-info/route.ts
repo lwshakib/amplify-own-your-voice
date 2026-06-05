@@ -53,7 +53,7 @@ export async function POST(req: Request) {
             : `User's Goal: "${finalGoal}"`,
         },
       ],
-      PersonaInfoSchema
+      PersonaInfoSchema,
     )
 
     return NextResponse.json({

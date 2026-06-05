@@ -658,9 +658,11 @@ export default function AiPersonaSession({
         const { uploadToS3Client } = await import("@/lib/s3-client")
         const path = await uploadToS3Client(audioBlob, "user-recordings")
         userAudioPath = path
-        
+
         // Optionally get a temporary signed URL for immediate preview/playback if needed by the UI
-        const res = await fetch(`/api/s3/signed-url?path=${encodeURIComponent(path)}`)
+        const res = await fetch(
+          `/api/s3/signed-url?path=${encodeURIComponent(path)}`,
+        )
         const { url } = await res.json()
         userAudioUrl = url
       } catch (err) {
