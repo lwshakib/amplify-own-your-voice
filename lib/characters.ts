@@ -17,7 +17,7 @@ export const CHARACTERS: Character[] = [
     gender: "female",
     model: "Aoede",
     avatar: "/avatars/aoede.png",
-    audio: "",
+    audio: "/audios/aoede.mp3",
   },
   {
     id: "zephyr",
@@ -26,7 +26,7 @@ export const CHARACTERS: Character[] = [
     gender: "male",
     model: "Zephyr",
     avatar: "/avatars/zephyr.png",
-    audio: "",
+    audio: "/audios/zephyr.mp3",
   },
   {
     id: "puck",
@@ -35,7 +35,7 @@ export const CHARACTERS: Character[] = [
     gender: "male",
     model: "Puck",
     avatar: "/avatars/puck.png",
-    audio: "",
+    audio: "/audios/puck.mp3",
   },
   {
     id: "charon",
@@ -44,7 +44,7 @@ export const CHARACTERS: Character[] = [
     gender: "male",
     model: "Charon",
     avatar: "/avatars/charon.png",
-    audio: "",
+    audio: "/audios/charon.mp3",
   },
   {
     id: "kore",
@@ -53,7 +53,7 @@ export const CHARACTERS: Character[] = [
     gender: "female",
     model: "Kore",
     avatar: "/avatars/kore.png",
-    audio: "",
+    audio: "/audios/kore.mp3",
   },
   {
     id: "fenrir",
@@ -62,7 +62,7 @@ export const CHARACTERS: Character[] = [
     gender: "male",
     model: "Fenrir",
     avatar: "/avatars/fenrir.png",
-    audio: "",
+    audio: "/audios/fenrir.mp3",
   },
   {
     id: "leda",
@@ -71,7 +71,7 @@ export const CHARACTERS: Character[] = [
     gender: "female",
     model: "Leda",
     avatar: "/avatars/leda.png",
-    audio: "",
+    audio: "/audios/leda.mp3",
   },
   {
     id: "orus",
@@ -80,7 +80,7 @@ export const CHARACTERS: Character[] = [
     gender: "male",
     model: "Orus",
     avatar: "/avatars/orus.png",
-    audio: "",
+    audio: "/audios/orus.mp3",
   },
   {
     id: "callirrhoe",
@@ -89,7 +89,7 @@ export const CHARACTERS: Character[] = [
     gender: "female",
     model: "Callirrhoe",
     avatar: "/avatars/callirrhoe.png",
-    audio: "",
+    audio: "/audios/callirrhoe.mp3",
   },
   {
     id: "autonoe",
@@ -98,7 +98,7 @@ export const CHARACTERS: Character[] = [
     gender: "female",
     model: "Autonoe",
     avatar: "/avatars/autonoe.png",
-    audio: "",
+    audio: "/audios/autonoe.mp3",
   },
 
   // TITANS, GIANTS & SHADOWS
@@ -109,7 +109,7 @@ export const CHARACTERS: Character[] = [
     gender: "male",
     model: "Enceladus",
     avatar: "/avatars/enceladus.png",
-    audio: "",
+    audio: "/audios/enceladus.mp3",
   },
   {
     id: "iapetus",
@@ -118,7 +118,7 @@ export const CHARACTERS: Character[] = [
     gender: "male",
     model: "Iapetus",
     avatar: "/avatars/iapetus.png",
-    audio: "",
+    audio: "/audios/iapetus.mp3",
   },
   {
     id: "umbriel",
@@ -127,7 +127,7 @@ export const CHARACTERS: Character[] = [
     gender: "male",
     model: "Umbriel",
     avatar: "/avatars/umbriel.png",
-    audio: "",
+    audio: "/audios/umbriel.mp3",
   },
   {
     id: "algieba",
@@ -136,7 +136,7 @@ export const CHARACTERS: Character[] = [
     gender: "male",
     model: "Algieba",
     avatar: "/avatars/algieba.png",
-    audio: "",
+    audio: "/audios/algieba.mp3",
   },
   {
     id: "despina",
@@ -145,7 +145,7 @@ export const CHARACTERS: Character[] = [
     gender: "female",
     model: "Despina",
     avatar: "/avatars/despina.png",
-    audio: "",
+    audio: "/audios/despina.mp3",
   },
   {
     id: "erinome",
@@ -154,7 +154,7 @@ export const CHARACTERS: Character[] = [
     gender: "female",
     model: "Erinome",
     avatar: "/avatars/erinome.png",
-    audio: "",
+    audio: "/audios/erinome.mp3",
   },
   {
     id: "algenib",
@@ -163,7 +163,7 @@ export const CHARACTERS: Character[] = [
     gender: "male",
     model: "Algenib",
     avatar: "/avatars/algenib.png",
-    audio: "",
+    audio: "/audios/algenib.mp3",
   },
   {
     id: "rasalgethi",
@@ -172,7 +172,7 @@ export const CHARACTERS: Character[] = [
     gender: "male",
     model: "Rasalgethi",
     avatar: "/avatars/rasalgethi.png",
-    audio: "",
+    audio: "/audios/rasalgethi.mp3",
   },
   {
     id: "laomedeia",
@@ -181,7 +181,7 @@ export const CHARACTERS: Character[] = [
     gender: "female",
     model: "Laomedeia",
     avatar: "/avatars/laomedeia.png",
-    audio: "",
+    audio: "/audios/laomedeia.mp3",
   },
   {
     id: "achernar",
@@ -190,7 +190,7 @@ export const CHARACTERS: Character[] = [
     gender: "male",
     model: "Achernar",
     avatar: "/avatars/achernar.png",
-    audio: "",
+    audio: "/audios/achernar.mp3",
   },
 
   // BRIGHT STARS & CONSTELLATIONS
@@ -201,7 +201,7 @@ export const CHARACTERS: Character[] = [
     gender: "male",
     model: "Alnilam",
     avatar: "/avatars/alnilam.png",
-    audio: "",
+    audio: "/audios/alnilam.mp3",
   },
   {
     id: "schedar",
@@ -210,7 +210,7 @@ export const CHARACTERS: Character[] = [
     gender: "female",
     model: "Schedar",
     avatar: "/avatars/schedar.png",
-    audio: "",
+    audio: "/audios/schedar.mp3",
   },
   {
     id: "gacrux",
@@ -219,7 +219,7 @@ export const CHARACTERS: Character[] = [
     gender: "male",
     model: "Gacrux",
     avatar: "/avatars/gacrux.png",
-    audio: "",
+    audio: "/audios/gacrux.mp3",
   },
   {
     id: "pulcherrima",
@@ -228,7 +228,7 @@ export const CHARACTERS: Character[] = [
     gender: "female",
     model: "Pulcherrima",
     avatar: "/avatars/pulcherrima.png",
-    audio: "",
+    audio: "/audios/pulcherrima.mp3",
   },
   {
     id: "achird",
@@ -237,7 +237,7 @@ export const CHARACTERS: Character[] = [
     gender: "male",
     model: "Achird",
     avatar: "/avatars/achird.png",
-    audio: "",
+    audio: "/audios/achird.mp3",
   },
   {
     id: "zubenelgenubi",
@@ -246,7 +246,7 @@ export const CHARACTERS: Character[] = [
     gender: "male",
     model: "Zubenelgenubi",
     avatar: "/avatars/zubenelgenubi.png",
-    audio: "",
+    audio: "/audios/zubenelgenubi.mp3",
   },
   {
     id: "vindemiatrix",
@@ -255,7 +255,7 @@ export const CHARACTERS: Character[] = [
     gender: "female",
     model: "Vindemiatrix",
     avatar: "/avatars/vindemiatrix.png",
-    audio: "",
+    audio: "/audios/vindemiatrix.mp3",
   },
   {
     id: "sadachbia",
@@ -264,7 +264,7 @@ export const CHARACTERS: Character[] = [
     gender: "female",
     model: "Sadachbia",
     avatar: "/avatars/sadachbia.png",
-    audio: "",
+    audio: "/audios/sadachbia.mp3",
   },
   {
     id: "sadaltager",
@@ -273,7 +273,7 @@ export const CHARACTERS: Character[] = [
     gender: "male",
     model: "Sadaltager",
     avatar: "/avatars/sadaltager.png",
-    audio: "",
+    audio: "/audios/sadaltager.mp3",
   },
   {
     id: "sulafat",
@@ -282,7 +282,7 @@ export const CHARACTERS: Character[] = [
     gender: "female",
     model: "Sulafat",
     avatar: "/avatars/sulafat.png",
-    audio: "",
+    audio: "/audios/sulafat.mp3",
   },
 ]
 
