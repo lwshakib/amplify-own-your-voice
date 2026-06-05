@@ -1,4 +1,4 @@
-import { s3Service } from "@/services/s3.services"
+import { uploadAsset, getSignedDownloadUrl } from "@/lib/s3"
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
@@ -23,14 +23,14 @@ export async function POST(req: NextRequest) {
     const arrayBuffer = await file.arrayBuffer()
     const buffer = Buffer.from(arrayBuffer)
 
-    const { path } = await s3Service.uploadAsset({
+    const { path } = await uploadAsset({
       buffer,
       folder: "user-recordings",
       extension: "wav", // Audio blobs from browser are often wav or webm, wav is a safe bet for recordings here
       contentType: "audio/wav",
     })
 
-    const signedUrl = await s3Service.getSignedDownloadUrl(path)
+    const signedUrl = await getSignedDownloadUrl(path)
 
     return NextResponse.json({
       path,
