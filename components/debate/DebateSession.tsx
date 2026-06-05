@@ -695,6 +695,7 @@ export default function DebateSession({
             try {
               const parsed = JSON.parse(dataStr)
               if (parsed.type === "text" && parsed.content) {
+                console.log("Debate suggestion chunk:", parsed.content)
                 setSuggestedText((prev) => prev + parsed.content)
               }
             } catch (err) {

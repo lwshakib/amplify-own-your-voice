@@ -760,6 +760,7 @@ export default function AiPersonaSession({
               try {
                 const parsed = JSON.parse(dataStr)
                 if (parsed.type === "text" && parsed.content) {
+                  console.log("Persona suggestion chunk:", parsed.content)
                   setStreamedText((prev) => prev + parsed.content)
                 }
               } catch (err) {

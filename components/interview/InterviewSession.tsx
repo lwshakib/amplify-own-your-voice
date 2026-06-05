@@ -748,6 +748,7 @@ export default function InterviewSession({
               try {
                 const parsed = JSON.parse(dataStr)
                 if (parsed.type === "text" && parsed.content) {
+                  console.log("Interview suggestion chunk:", parsed.content)
                   setStreamedText((prev) => prev + parsed.content)
                 }
               } catch (err) {

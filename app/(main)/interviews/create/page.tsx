@@ -92,6 +92,7 @@ export default function CreateInterviewPage() {
             try {
               const parsed = JSON.parse(dataStr)
               if (parsed.type === "text" && parsed.content) {
+                console.log("Job description chunk:", parsed.content)
                 setDescription((prev) => prev + parsed.content)
               }
             } catch (err) {
