@@ -340,8 +340,18 @@ export default function InterviewSession({
           // Trigger first turn greeting
           ws.send(
             JSON.stringify({
-              realtimeInput: {
-                text: "Please start the session by greeting the candidate and introducing yourself.",
+              clientContent: {
+                turns: [
+                  {
+                    role: "user",
+                    parts: [
+                      {
+                        text: "Please start the session by greeting the candidate and introducing yourself.",
+                      },
+                    ],
+                  },
+                ],
+                turnComplete: true,
               },
             }),
           )
@@ -661,8 +671,18 @@ export default function InterviewSession({
 
       fluxWsRef.current.send(
         JSON.stringify({
-          realtimeInput: {
-            text: codeSubmissionText,
+          clientContent: {
+            turns: [
+              {
+                role: "user",
+                parts: [
+                  {
+                    text: codeSubmissionText,
+                  },
+                ],
+              },
+            ],
+            turnComplete: true,
           },
         }),
       )
