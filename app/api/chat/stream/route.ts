@@ -1,4 +1,4 @@
-import { aiService } from "@/services/ai.services"
+import { streamText } from "@/llm/streamText"
 import { validateSession } from "@/lib/auth-utils"
 import { NextResponse } from "next/server"
 import { CoachStreamSchema } from "@/schemas/coach"
@@ -97,7 +97,7 @@ export async function POST(req: Request) {
       },
     ]
 
-    const stream = await aiService.streamText(augmentedMessages)
+    const stream = await streamText(augmentedMessages)
 
     return new Response(stream, {
       headers: {
