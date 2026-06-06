@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { aiService } from "@/services/ai.services"
+import { generateText } from "@/llm/generateText"
 import { DebateMotionSchema } from "@/schemas/generation"
 
 export async function POST(req: Request) {
@@ -28,7 +28,7 @@ export async function POST(req: Request) {
       },
     ]
 
-    const motion = await aiService.generateText(messages)
+    const motion = await generateText(messages)
 
     return NextResponse.json({ motion: motion.trim() })
   } catch (error: unknown) {
