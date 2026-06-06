@@ -21,13 +21,15 @@ export async function GET(
       },
       include: {
         interview: true,
+        debate: true,
+        aiPersona: true,
         user: true,
       },
     })
 
-    if (!interaction || interaction.type !== "INTERVIEW") {
+    if (!interaction) {
       return NextResponse.json(
-        { error: "Interview session not found" },
+        { error: "Session not found" },
         { status: 404 },
       )
     }
@@ -53,8 +55,24 @@ export async function GET(
             characterId: interaction.interview.characterId,
           }
         : null,
-      debate: null,
-      aiPersona: null,
+      debate: interaction.debate
+        ? {
+            id: interaction.debate.id,
+            subject: interaction.debate.subject,
+            content: interaction.debate.content,
+            judgeId: interaction.debate.judgeId,
+            opponentId: interaction.debate.opponentId,
+            opponentIds: (interaction.debate.opponentIds as string[]) || [],
+          }
+        : null,
+      aiPersona: interaction.aiPersona
+        ? {
+            id: interaction.aiPersona.id,
+            name: interaction.aiPersona.name,
+            instruction: interaction.aiPersona.instruction,
+            characterId: interaction.aiPersona.characterId,
+          }
+        : null,
     }
 
     const systemPrompt = feature.getPrompt(
@@ -63,11 +81,32 @@ export async function GET(
       [],
     )
 
-    const charId = interaction.interview?.characterId || "sarah"
+    const charId =
+      interaction.type === "INTERVIEW"
+        ? (interaction.interview?.characterId || "sarah")
+        : interaction.type === "DEBATE"
+          ? (interaction.debate?.judgeId || "ethan")
+          : (interaction.aiPersona?.characterId || "aoede")
+
     const character = getCharacter(charId)
     // Multimodal Live API prebuilt voices include: Puck, Charon, Kore, Fenrir, Aoede
-    // Default to 'Aoede' if character model is not set
-    const voiceName = character?.model || "Aoede"
+    const allowedVoices = ["Puck", "Charon", "Kore", "Fenrir", "Aoede"]
+    let voiceName = "Aoede"
+
+    if (
+      character?.model &&
+      allowedVoices.some((v) => v.toLowerCase() === character.model.toLowerCase())
+    ) {
+      voiceName = allowedVoices.find(
+        (v) => v.toLowerCase() === character.model.toLowerCase(),
+      )!
+    } else {
+      if (character?.gender === "male") {
+        voiceName = "Charon"
+      } else {
+        voiceName = "Aoede"
+      }
+    }
 
     const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY
     if (!apiKey) {
@@ -87,7 +126,7 @@ export async function GET(
         expireTime,
         newSessionExpireTime,
         liveConnectConstraints: {
-          model: "gemini-2.0-flash-exp",
+          model: "gemini-3.1-flash-live-preview",
           config: {
             sessionResumption: {},
             temperature: 0.7,
@@ -102,7 +141,7 @@ export async function GET(
 
     return NextResponse.json({
       token: tokenResponse.name,
-      model: "gemini-2.0-flash-exp",
+      model: "gemini-3.1-flash-live-preview",
       systemInstructions: systemPrompt,
       voiceName,
     })
