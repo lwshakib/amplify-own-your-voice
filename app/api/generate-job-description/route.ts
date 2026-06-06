@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { aiService } from "@/services/ai.services"
+import { streamText } from "@/llm/streamText"
 import { JobDescriptionGenerationSchema } from "@/schemas/generation"
 
 
@@ -43,7 +43,7 @@ async function* makeIterator(jobTitle: string, type?: "TECHNICAL" | "GENERAL") {
     },
   ]
 
-  const readableStream = await aiService.streamText(messages)
+  const readableStream = await streamText(messages)
   const reader = readableStream.getReader()
 
   try {
