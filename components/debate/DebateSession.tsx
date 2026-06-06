@@ -220,6 +220,26 @@ export default function DebateSession({
     })
   }, [])
 
+  const stopMicrophoneStreaming = () => {
+    if (processorRef.current) {
+      processorRef.current.disconnect()
+      processorRef.current = null
+    }
+    if (audioContextRef.current) {
+      audioContextRef.current.close()
+      audioContextRef.current = null
+    }
+    if (micStreamRef.current) {
+      micStreamRef.current.getTracks().forEach((track) => track.stop())
+      micStreamRef.current = null
+    }
+    if (fluxWsRef.current && fluxWsRef.current.readyState === WebSocket.OPEN) {
+      fluxWsRef.current.send(
+        JSON.stringify({ realtimeInput: { audioStreamEnd: true } }),
+      )
+    }
+  }
+
   const stopAll = useCallback(() => {
     stopMicrophoneStreaming()
     stopAudioPlayback()
@@ -855,25 +875,7 @@ export default function DebateSession({
     }
   }
 
-  const stopMicrophoneStreaming = () => {
-    if (processorRef.current) {
-      processorRef.current.disconnect()
-      processorRef.current = null
-    }
-    if (audioContextRef.current) {
-      audioContextRef.current.close()
-      audioContextRef.current = null
-    }
-    if (micStreamRef.current) {
-      micStreamRef.current.getTracks().forEach((track) => track.stop())
-      micStreamRef.current = null
-    }
-    if (fluxWsRef.current && fluxWsRef.current.readyState === WebSocket.OPEN) {
-      fluxWsRef.current.send(
-        JSON.stringify({ realtimeInput: { audioStreamEnd: true } }),
-      )
-    }
-  }
+  // stopMicrophoneStreaming is declared above stopAll
 
   const startMicrophoneStreaming = async () => {
     if (!fluxWsRef.current || fluxWsRef.current.readyState !== WebSocket.OPEN) {
