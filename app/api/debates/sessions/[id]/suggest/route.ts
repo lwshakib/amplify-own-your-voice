@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
-import { aiService } from "@/services/ai.services"
+import { streamText } from "@/llm/streamText"
 import { ChatBatchSchema } from "@/schemas/chat"
 
 export async function POST(
@@ -123,7 +123,7 @@ Do not include any introductory notes, instructions, or coaching advice like "He
 Just the raw speech content.
 `
 
-    const stream = await aiService.streamText([
+    const stream = await streamText([
       { role: "system", content: systemPrompt },
       ...coreMessages,
     ])
