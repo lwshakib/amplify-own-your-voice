@@ -1,6 +1,6 @@
 import { validateSession } from "@/lib/auth-utils"
 import { NextResponse } from "next/server"
-import { aiService } from "@/services/ai.services"
+import { generateObject } from "@/llm/generateObject"
 import {
   PersonaInfoSchema,
   GeneratePersonaInfoInputSchema,
@@ -39,7 +39,7 @@ export async function POST(req: Request) {
       goal,
     })
 
-    const generatedInfo = await aiService.generateObject(
+    const generatedInfo = await generateObject(
       [
         {
           role: "system",
