@@ -53,8 +53,7 @@ pnpm install
    - `AWS_ACCESS_KEY_ID`
    - `AWS_SECRET_ACCESS_KEY`
    - `AWS_S3_BUCKET_NAME`
-   - `CLOUDFLARE_AI_GATEWAY_API_KEY`
-   - `CLOUDFLARE_AI_GATEWAY_ENDPOINT`
+   - `GEMINI_API_KEY`
    - `RESEND_API_KEY`
 
 ### 4) Database Initialization
