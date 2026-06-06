@@ -45,7 +45,8 @@ export default function LoginPage() {
               Welcome to Amplify
             </h1>
             <p className="text-xs text-zinc-400 max-w-[280px] mx-auto text-balance leading-normal">
-              Elevate your speech and interviews. Continue with Google to access your dashboard.
+              Elevate your speech and interviews. Continue with Google to access
+              your dashboard.
             </p>
           </div>
 
@@ -77,9 +78,20 @@ export default function LoginPage() {
           <div className="pt-4 space-y-1">
             <p className="text-[10px] text-zinc-500 max-w-[260px] mx-auto leading-normal">
               By continuing, you agree to our{" "}
-              <a href="#" className="underline hover:text-zinc-400 transition-colors">Terms of Service</a>
-              {" "}and{" "}
-              <a href="#" className="underline hover:text-zinc-400 transition-colors">Privacy Policy</a>.
+              <a
+                href="#"
+                className="underline hover:text-zinc-400 transition-colors"
+              >
+                Terms of Service
+              </a>{" "}
+              and{" "}
+              <a
+                href="#"
+                className="underline hover:text-zinc-400 transition-colors"
+              >
+                Privacy Policy
+              </a>
+              .
             </p>
             <p className="text-[9px] text-zinc-600">
               Secured with decentralized authentication.

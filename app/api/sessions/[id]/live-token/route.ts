@@ -28,10 +28,7 @@ export async function GET(
     })
 
     if (!interaction) {
-      return NextResponse.json(
-        { error: "Session not found" },
-        { status: 404 },
-      )
+      return NextResponse.json({ error: "Session not found" }, { status: 404 })
     }
 
     const feature = getFeatureLogic(interaction.type)
@@ -83,10 +80,10 @@ export async function GET(
 
     const charId =
       interaction.type === "INTERVIEW"
-        ? (interaction.interview?.characterId || "sarah")
+        ? interaction.interview?.characterId || "sarah"
         : interaction.type === "DEBATE"
-          ? (interaction.debate?.judgeId || "ethan")
-          : (interaction.aiPersona?.characterId || "aoede")
+          ? interaction.debate?.judgeId || "ethan"
+          : interaction.aiPersona?.characterId || "aoede"
 
     const character = getCharacter(charId)
     // Multimodal Live API prebuilt voices include: Puck, Charon, Kore, Fenrir, Aoede
@@ -95,7 +92,9 @@ export async function GET(
 
     if (
       character?.model &&
-      allowedVoices.some((v) => v.toLowerCase() === character.model.toLowerCase())
+      allowedVoices.some(
+        (v) => v.toLowerCase() === character.model.toLowerCase(),
+      )
     ) {
       voiceName = allowedVoices.find(
         (v) => v.toLowerCase() === character.model.toLowerCase(),
@@ -118,7 +117,9 @@ export async function GET(
 
     const client = new GoogleGenAI({ apiKey })
     const expireTime = new Date(Date.now() + 30 * 60 * 1000).toISOString()
-    const newSessionExpireTime = new Date(Date.now() + 5 * 60 * 1000).toISOString()
+    const newSessionExpireTime = new Date(
+      Date.now() + 5 * 60 * 1000,
+    ).toISOString()
 
     const tokenResponse = await client.authTokens.create({
       config: {

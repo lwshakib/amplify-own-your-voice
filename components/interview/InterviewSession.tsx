@@ -42,7 +42,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { AgentInteraction, AuthUser, Message, MessagePart } from "@/types/features"
+import {
+  AgentInteraction,
+  AuthUser,
+  Message,
+  MessagePart,
+} from "@/types/features"
 
 interface InterviewSessionProps {
   id: string
@@ -280,7 +285,8 @@ export default function InterviewSession({
 
       const tokenRes = await fetch(`/api/sessions/${id}/live-token`)
       if (!tokenRes.ok) throw new Error("Failed to fetch live ephemeral token")
-      const { token, model, systemInstructions, voiceName } = await tokenRes.json()
+      const { token, model, systemInstructions, voiceName } =
+        await tokenRes.json()
 
       const wsUrl = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContentConstrained?access_token=${token}`
       const ws = new WebSocket(wsUrl)
@@ -333,7 +339,9 @@ export default function InterviewSession({
               },
             ],
           }))
-          ws.send(JSON.stringify({ clientContent: { turns, turnComplete: true } }))
+          ws.send(
+            JSON.stringify({ clientContent: { turns, turnComplete: true } }),
+          )
           setIsThinking(false)
           setIsUsersTurn(messages[messages.length - 1].role === "assistant")
         } else {
@@ -449,42 +457,47 @@ export default function InterviewSession({
             const now = playbackContextRef.current?.currentTime || 0
             const playDelay = (nextPlaybackTimeRef.current - now) * 1000
 
-            setTimeout(async () => {
-              if (finalOutputText) {
-                await fetch(`/api/sessions/${id}/messages`, {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({
-                    role: "assistant",
-                    text: finalOutputText,
-                    speakerName:
-                      character ? `${character.firstName} ${character.lastName}` : "Sarah Miller",
-                    speakerTitle: "Interviewer",
-                    duration: timerRef.current,
-                  }),
-                })
-
-                const assistantMsg: Message = {
-                  role: "assistant",
-                  parts: [
-                    {
-                      type: "text",
+            setTimeout(
+              async () => {
+                if (finalOutputText) {
+                  await fetch(`/api/sessions/${id}/messages`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      role: "assistant",
                       text: finalOutputText,
-                      speakerName:
-                        character ? `${character.firstName} ${character.lastName}` : "Sarah Miller",
+                      speakerName: character
+                        ? `${character.firstName} ${character.lastName}`
+                        : "Sarah Miller",
                       speakerTitle: "Interviewer",
-                      isUsersTurn: true,
-                      audio: { url: null, path: null },
-                    },
-                  ],
-                }
-                setMessages((prev) => [...prev, assistantMsg])
-                accumulatedOutputTextRef.current = ""
-              }
+                      duration: timerRef.current,
+                    }),
+                  })
 
-              setIsAiTalking(false)
-              setIsUsersTurn(true)
-            }, Math.max(0, playDelay))
+                  const assistantMsg: Message = {
+                    role: "assistant",
+                    parts: [
+                      {
+                        type: "text",
+                        text: finalOutputText,
+                        speakerName: character
+                          ? `${character.firstName} ${character.lastName}`
+                          : "Sarah Miller",
+                        speakerTitle: "Interviewer",
+                        isUsersTurn: true,
+                        audio: { url: null, path: null },
+                      },
+                    ],
+                  }
+                  setMessages((prev) => [...prev, assistantMsg])
+                  accumulatedOutputTextRef.current = ""
+                }
+
+                setIsAiTalking(false)
+                setIsUsersTurn(true)
+              },
+              Math.max(0, playDelay),
+            )
           }
         } catch (err) {
           console.error("Error processing Gemini response:", err)
@@ -527,12 +540,11 @@ export default function InterviewSession({
       micStreamRef.current.getTracks().forEach((track) => track.stop())
       micStreamRef.current = null
     }
-    if (
-      fluxWsRef.current &&
-      fluxWsRef.current.readyState === WebSocket.OPEN
-    ) {
+    if (fluxWsRef.current && fluxWsRef.current.readyState === WebSocket.OPEN) {
       // Send audioStreamEnd to signal end of user turn
-      fluxWsRef.current.send(JSON.stringify({ realtimeInput: { audioStreamEnd: true } }))
+      fluxWsRef.current.send(
+        JSON.stringify({ realtimeInput: { audioStreamEnd: true } }),
+      )
     }
   }
 

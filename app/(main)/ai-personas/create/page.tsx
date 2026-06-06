@@ -79,8 +79,6 @@ export default function CreateCustomAgentPage() {
     path: string
   } | null>(null)
 
-
-
   const [suggestedPrompts, setSuggestedPrompts] = useState<string[]>([])
   const [generateAbortController, setGenerateAbortController] =
     useState<AbortController | null>(null)
@@ -165,7 +163,6 @@ export default function CreateCustomAgentPage() {
       toast.error("Failed to upload avatar", { id: toastId })
     }
   }
-
 
   /**
    * Magic Builder Logic

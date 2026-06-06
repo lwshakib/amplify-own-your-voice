@@ -2,7 +2,13 @@
 
 import { motion } from "framer-motion"
 import { Logo } from "@/components/layout/logo"
-import { IconSparkles, IconActivity, IconLock, IconMessageChatbot, IconVolume } from "@tabler/icons-react"
+import {
+  IconSparkles,
+  IconActivity,
+  IconLock,
+  IconMessageChatbot,
+  IconVolume,
+} from "@tabler/icons-react"
 
 export function AuthVisual() {
   // 17 bars for a minimal soundwave visualizer
@@ -27,18 +33,18 @@ export function AuthVisual() {
             // Generate symmetric heights for a neat, balanced look
             const distanceFromCenter = Math.abs(i - 8)
             const baseHeight = Math.max(12, 64 - distanceFromCenter * 6)
-            
+
             // Animation height boundaries
             const minHeight = baseHeight * 0.35
             const maxHeight = baseHeight * 1.25
-            
+
             return (
               <motion.div
                 key={i}
                 className="w-1.5 rounded-full bg-primary"
                 style={{
                   height: baseHeight,
-                  opacity: 0.2 + (1 - distanceFromCenter / 9) * 0.8
+                  opacity: 0.2 + (1 - distanceFromCenter / 9) * 0.8,
                 }}
                 animate={{
                   height: [minHeight, maxHeight, minHeight],
@@ -61,7 +67,8 @@ export function AuthVisual() {
           Amplify your voice
         </h2>
         <p className="max-w-xs text-xs text-zinc-400 leading-relaxed">
-          Train and master your communication skills with real-time AI mock interviews and debates.
+          Train and master your communication skills with real-time AI mock
+          interviews and debates.
         </p>
       </div>
     </div>

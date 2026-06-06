@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server"
 import { streamText } from "@/llm/streamText"
 import { JobDescriptionGenerationSchema } from "@/schemas/generation"
 
-
 const encoder = new TextEncoder()
 
 /**
@@ -65,7 +64,10 @@ export async function GET(req: NextRequest) {
     const jobTitle = searchParams.get("jobTitle") || ""
     const type = searchParams.get("type") || undefined
 
-    const validation = JobDescriptionGenerationSchema.safeParse({ jobTitle, type })
+    const validation = JobDescriptionGenerationSchema.safeParse({
+      jobTitle,
+      type,
+    })
 
     if (!validation.success) {
       return NextResponse.json(
@@ -74,14 +76,17 @@ export async function GET(req: NextRequest) {
       )
     }
 
-    const iterator = makeIterator(validation.data.jobTitle, validation.data.type)
+    const iterator = makeIterator(
+      validation.data.jobTitle,
+      validation.data.type,
+    )
     const stream = iteratorToStream(iterator)
 
     return new Response(stream, {
       headers: {
         "Content-Type": "text/event-stream; charset=utf-8",
         "Cache-Control": "no-cache, no-transform",
-        "Connection": "keep-alive",
+        Connection: "keep-alive",
         "X-Accel-Buffering": "no",
         "X-Content-Type-Options": "nosniff",
       },
@@ -94,4 +99,3 @@ export async function GET(req: NextRequest) {
     )
   }
 }
-

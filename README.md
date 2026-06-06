@@ -11,7 +11,7 @@
 
 **Amplify** is a state-of-the-art, AI-augmented communication laboratory designed to transform how individuals express their ideas. From the high-pressure environment of executive interviews to the intellectual rigor of the **Debate Arena**, Amplify provides a sophisticated sandbox for cognitive and verbal mastery.
 
-Leveraging the precision of **Google Gemini** and the natural resonance of **Deepgram**, we bridge the gap between thought and expression, empowering you to truly **Own Your Voice**.
+Leveraging the precision and speed of the **Google Gemini Multimodal Live API** over WebSockets, we bridge the gap between thought and expression, empowering you to truly **Own Your Voice**.
 
 ![Interview Session](./public/app_demo/01.png)
 ![Interview Session](./public/app_demo/02.png)
@@ -49,18 +49,15 @@ graph TD
     C --> D[AI Interviewer]
     C --> E[Debate Arena]
     C --> F[AI Persona Chat]
-    D & E & F --> G[Gemini AI Engine]
-    G --> H[Deepgram TTS]
-    H --> I[Voice Response]
-    I --> A
+    D & E & F --> G[Gemini Multimodal Live API]
+    G -->|WebSocket PCM Stream| A
 ```
 
 ## 🛠️ Technology Stack
 
 - **Framework**: [Next.js 15](https://nextjs.org) (App Router)
 - **Database**: [Prisma](https://prisma.io) with PostgreSQL (Neon)
-- **AI Engine**: [Google Gemini AI](https://ai.google.dev/)
-- **Voice Synthesis**: [Deepgram](https://deepgram.com)
+- **AI Live Stream & Audio**: [Google Gemini Multimodal Live API](https://ai.google.dev/)
 - **Styling**: [Tailwind CSS 4](https://tailwindcss.com) & [Shadcn UI](https://ui.shadcn.com)
 - **Authentication**: [Better Auth](https://better-auth.com)
 - **Animations**: [Motion](https://motion.dev)

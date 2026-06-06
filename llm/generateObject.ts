@@ -77,7 +77,7 @@ export async function generateObject<T = any>(
   }
 
   const parsed = JSON.parse(text)
-  
+
   if (actualSchema && typeof actualSchema.parse === "function") {
     return actualSchema.parse(parsed)
   }

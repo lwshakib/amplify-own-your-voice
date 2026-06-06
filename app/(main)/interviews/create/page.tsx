@@ -73,7 +73,9 @@ export default function CreateInterviewPage() {
       type,
     })
 
-    const eventSource = new EventSource(`/api/generate-job-description?${params.toString()}`)
+    const eventSource = new EventSource(
+      `/api/generate-job-description?${params.toString()}`,
+    )
     eventSourceRef.current = eventSource
 
     eventSource.onopen = () => {

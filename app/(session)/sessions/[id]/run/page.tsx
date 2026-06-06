@@ -32,10 +32,13 @@ const AiPersonaSession = dynamic(
     loading: () => <SessionLoader label="Loading AI Personality..." />,
   },
 )
-const DebateSession = dynamic(() => import("@/components/debate/DebateSession"), {
-  ssr: false,
-  loading: () => <SessionLoader label="Preparing Debate Floor..." />,
-})
+const DebateSession = dynamic(
+  () => import("@/components/debate/DebateSession"),
+  {
+    ssr: false,
+    loading: () => <SessionLoader label="Preparing Debate Floor..." />,
+  },
+)
 
 /**
  * Shared props interface for all specialized session types.

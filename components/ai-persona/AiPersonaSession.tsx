@@ -173,8 +173,7 @@ export default function AiPersonaSession({
   const getPlaybackContext = () => {
     if (!playbackContextRef.current) {
       playbackContextRef.current = new (
-        window.AudioContext ||
-        (window as any).webkitAudioContext
+        window.AudioContext || (window as any).webkitAudioContext
       )({ sampleRate: 24000 })
     }
     return playbackContextRef.current
@@ -338,7 +337,8 @@ export default function AiPersonaSession({
     try {
       const tokenRes = await fetch(`/api/sessions/${id}/live-token`)
       if (!tokenRes.ok) throw new Error("Failed to fetch live ephemeral token")
-      const { token, model, systemInstructions, voiceName } = await tokenRes.json()
+      const { token, model, systemInstructions, voiceName } =
+        await tokenRes.json()
 
       const wsUrl = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContentConstrained?access_token=${token}`
       const ws = new WebSocket(wsUrl)
@@ -391,7 +391,9 @@ export default function AiPersonaSession({
               },
             ],
           }))
-          ws.send(JSON.stringify({ clientContent: { turns, turnComplete: true } }))
+          ws.send(
+            JSON.stringify({ clientContent: { turns, turnComplete: true } }),
+          )
           setIsThinking(false)
           setIsUsersTurn(messages[messages.length - 1].role === "assistant")
         } else {
@@ -507,40 +509,43 @@ export default function AiPersonaSession({
             const now = playbackContextRef.current?.currentTime || 0
             const playDelay = (nextPlaybackTimeRef.current - now) * 1000
 
-            setTimeout(async () => {
-              if (finalOutputText) {
-                await fetch(`/api/sessions/${id}/messages`, {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({
-                    role: "assistant",
-                    text: finalOutputText,
-                    speakerName: session.aiPersona?.name || "Agent",
-                    speakerTitle: "Interviewer",
-                    duration: timerRef.current,
-                  }),
-                })
-
-                const assistantMsg: Message = {
-                  role: "assistant",
-                  parts: [
-                    {
-                      type: "text",
+            setTimeout(
+              async () => {
+                if (finalOutputText) {
+                  await fetch(`/api/sessions/${id}/messages`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      role: "assistant",
                       text: finalOutputText,
                       speakerName: session.aiPersona?.name || "Agent",
                       speakerTitle: "Interviewer",
-                      isUsersTurn: true,
-                      audio: { url: null, path: null },
-                    },
-                  ],
-                }
-                setMessages((prev) => [...prev, assistantMsg])
-                accumulatedOutputTextRef.current = ""
-              }
+                      duration: timerRef.current,
+                    }),
+                  })
 
-              setIsAiTalking(false)
-              setIsUsersTurn(true)
-            }, Math.max(0, playDelay))
+                  const assistantMsg: Message = {
+                    role: "assistant",
+                    parts: [
+                      {
+                        type: "text",
+                        text: finalOutputText,
+                        speakerName: session.aiPersona?.name || "Agent",
+                        speakerTitle: "Interviewer",
+                        isUsersTurn: true,
+                        audio: { url: null, path: null },
+                      },
+                    ],
+                  }
+                  setMessages((prev) => [...prev, assistantMsg])
+                  accumulatedOutputTextRef.current = ""
+                }
+
+                setIsAiTalking(false)
+                setIsUsersTurn(true)
+              },
+              Math.max(0, playDelay),
+            )
           }
         } catch (err) {
           console.error("Error processing Gemini response:", err)
@@ -582,11 +587,10 @@ export default function AiPersonaSession({
       micStreamRef.current.getTracks().forEach((track) => track.stop())
       micStreamRef.current = null
     }
-    if (
-      fluxWsRef.current &&
-      fluxWsRef.current.readyState === WebSocket.OPEN
-    ) {
-      fluxWsRef.current.send(JSON.stringify({ realtimeInput: { audioStreamEnd: true } }))
+    if (fluxWsRef.current && fluxWsRef.current.readyState === WebSocket.OPEN) {
+      fluxWsRef.current.send(
+        JSON.stringify({ realtimeInput: { audioStreamEnd: true } }),
+      )
     }
     setIsUserTalking(false)
   }
@@ -611,8 +615,7 @@ export default function AiPersonaSession({
       setIsUserTalking(true)
 
       const audioContext = new (
-        window.AudioContext ||
-        (window as any).webkitAudioContext
+        window.AudioContext || (window as any).webkitAudioContext
       )({ sampleRate: 16000 })
       audioContextRef.current = audioContext
 
@@ -1474,7 +1477,10 @@ export default function AiPersonaSession({
                   <Button
                     onClick={() => {
                       setIsCodingModalOpen(false)
-                      handleSend("I've updated the code. Please review it.", currentCode)
+                      handleSend(
+                        "I've updated the code. Please review it.",
+                        currentCode,
+                      )
                     }}
                     className="bg-primary hover:bg-primary/90 text-primary-foreground font-medium text-xs px-8 h-10 rounded-md shadow-sm"
                   >

@@ -50,7 +50,6 @@ export function EditAiPersonaModal({
   } | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-
   const [isGeneratingInfo, setIsGeneratingInfo] = useState(false)
   const [goal, setGoal] = useState("")
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -88,7 +87,6 @@ export function EditAiPersonaModal({
       setIsSubmitting(false)
     }
   }
-
 
   const handleRefineInstructions = async () => {
     if (!goal) {
@@ -201,7 +199,6 @@ export function EditAiPersonaModal({
                     accept="image/*"
                     onChange={handleAvatarUpload}
                   />
-
                 </div>
 
                 {/* Form Fields */}

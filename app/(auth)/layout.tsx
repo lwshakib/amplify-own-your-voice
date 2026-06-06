@@ -25,9 +25,7 @@ export default function AuthLayout({
       </div>
 
       {/* Right Column - Dynamic Auth Forms (Sign In, Sign Up, etc.) */}
-      <div className="flex flex-col min-h-svh">
-        {children}
-      </div>
+      <div className="flex flex-col min-h-svh">{children}</div>
     </div>
   )
 }

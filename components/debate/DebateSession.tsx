@@ -32,7 +32,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { AgentInteraction, AuthUser, Message, MessagePart } from "@/types/features"
+import {
+  AgentInteraction,
+  AuthUser,
+  Message,
+  MessagePart,
+} from "@/types/features"
 
 interface DebateSessionProps {
   id: string
@@ -135,8 +140,7 @@ export default function DebateSession({
   const getPlaybackContext = () => {
     if (!playbackContextRef.current) {
       playbackContextRef.current = new (
-        window.AudioContext ||
-        (window as any).webkitAudioContext
+        window.AudioContext || (window as any).webkitAudioContext
       )({ sampleRate: 24000 })
     }
     return playbackContextRef.current
@@ -253,22 +257,127 @@ export default function DebateSession({
     const isUserPro = userSide === "PRO"
 
     const rolesSequence = [
-      { id: 1, speaker: judge, role: "Judge", title: "Judge Opening", isUser: false, prompt: "Please start the debate by presenting and welcoming the audience, then invite the Prime Minister." },
-      { id: 2, speaker: isUserPro ? { firstName: userName } : lead, role: "Prime Minister", title: "Prime Minister Speech", isUser: isUserPro, prompt: "Please deliver the Prime Minister opening speech supporting the motion." },
-      { id: 3, speaker: judge, role: "Judge", title: "Judge Transition to Lead Opponent", isUser: false, prompt: "Preside as the judge: synthesize the Prime Minister's speech, then invite the Leader of Opposition to speak next." },
-      { id: 4, speaker: isUserPro ? lead : { firstName: userName }, role: "Leader of Opposition", title: "Leader of Opposition Speech", isUser: !isUserPro, prompt: "Please deliver the Leader of Opposition opening speech opposing the motion." },
-      { id: 5, speaker: judge, role: "Judge", title: "Judge Transition to Deputy PM", isUser: false, prompt: "Preside as the judge: synthesize the Leader of Opposition's speech, then invite the Deputy Prime Minister to speak next." },
-      { id: 6, speaker: isUserPro ? { firstName: userName } : deputy, role: "Deputy Prime Minister", title: "Deputy Prime Minister Speech", isUser: isUserPro, prompt: "Please deliver the Deputy Prime Minister speech supporting the motion." },
-      { id: 7, speaker: judge, role: "Judge", title: "Judge Transition to Deputy LO", isUser: false, prompt: "Preside as the judge: synthesize the Deputy Prime Minister's speech, then invite the Deputy Leader of Opposition to speak next." },
-      { id: 8, speaker: isUserPro ? deputy : { firstName: userName }, role: "Deputy Leader of Opposition", title: "Deputy Leader of Opposition Speech", isUser: !isUserPro, prompt: "Please deliver the Deputy Leader of Opposition speech opposing the motion." },
-      { id: 9, speaker: judge, role: "Judge", title: "Judge Transition to Affirmative Rebuttal", isUser: false, prompt: "Preside as the judge: synthesize the Deputy Leader of Opposition's speech, then invite the Affirmative Rebuttal speaker next." },
-      { id: 10, speaker: isUserPro ? { firstName: userName } : whip, role: "Affirmative Rebuttal", title: "Affirmative Rebuttal Speech", isUser: isUserPro, prompt: "Please deliver the Affirmative Rebuttal speech supporting the motion." },
-      { id: 11, speaker: judge, role: "Judge", title: "Judge Transition to Opposition Whip", isUser: false, prompt: "Preside as the judge: synthesize the Affirmative Rebuttal speech, then invite the Opposition Whip next." },
-      { id: 12, speaker: isUserPro ? whip : { firstName: userName }, role: "Opposition Whip", title: "Opposition Whip Speech", isUser: !isUserPro, prompt: "Please deliver the Opposition Whip speech opposing the motion." },
-      { id: 13, speaker: judge, role: "Judge", title: "Judge Closing & Winner", isUser: false, prompt: "Preside as the judge: summarize the debate, announce the winner, and close the session." }
+      {
+        id: 1,
+        speaker: judge,
+        role: "Judge",
+        title: "Judge Opening",
+        isUser: false,
+        prompt:
+          "Please start the debate by presenting and welcoming the audience, then invite the Prime Minister.",
+      },
+      {
+        id: 2,
+        speaker: isUserPro ? { firstName: userName } : lead,
+        role: "Prime Minister",
+        title: "Prime Minister Speech",
+        isUser: isUserPro,
+        prompt:
+          "Please deliver the Prime Minister opening speech supporting the motion.",
+      },
+      {
+        id: 3,
+        speaker: judge,
+        role: "Judge",
+        title: "Judge Transition to Lead Opponent",
+        isUser: false,
+        prompt:
+          "Preside as the judge: synthesize the Prime Minister's speech, then invite the Leader of Opposition to speak next.",
+      },
+      {
+        id: 4,
+        speaker: isUserPro ? lead : { firstName: userName },
+        role: "Leader of Opposition",
+        title: "Leader of Opposition Speech",
+        isUser: !isUserPro,
+        prompt:
+          "Please deliver the Leader of Opposition opening speech opposing the motion.",
+      },
+      {
+        id: 5,
+        speaker: judge,
+        role: "Judge",
+        title: "Judge Transition to Deputy PM",
+        isUser: false,
+        prompt:
+          "Preside as the judge: synthesize the Leader of Opposition's speech, then invite the Deputy Prime Minister to speak next.",
+      },
+      {
+        id: 6,
+        speaker: isUserPro ? { firstName: userName } : deputy,
+        role: "Deputy Prime Minister",
+        title: "Deputy Prime Minister Speech",
+        isUser: isUserPro,
+        prompt:
+          "Please deliver the Deputy Prime Minister speech supporting the motion.",
+      },
+      {
+        id: 7,
+        speaker: judge,
+        role: "Judge",
+        title: "Judge Transition to Deputy LO",
+        isUser: false,
+        prompt:
+          "Preside as the judge: synthesize the Deputy Prime Minister's speech, then invite the Deputy Leader of Opposition to speak next.",
+      },
+      {
+        id: 8,
+        speaker: isUserPro ? deputy : { firstName: userName },
+        role: "Deputy Leader of Opposition",
+        title: "Deputy Leader of Opposition Speech",
+        isUser: !isUserPro,
+        prompt:
+          "Please deliver the Deputy Leader of Opposition speech opposing the motion.",
+      },
+      {
+        id: 9,
+        speaker: judge,
+        role: "Judge",
+        title: "Judge Transition to Affirmative Rebuttal",
+        isUser: false,
+        prompt:
+          "Preside as the judge: synthesize the Deputy Leader of Opposition's speech, then invite the Affirmative Rebuttal speaker next.",
+      },
+      {
+        id: 10,
+        speaker: isUserPro ? { firstName: userName } : whip,
+        role: "Affirmative Rebuttal",
+        title: "Affirmative Rebuttal Speech",
+        isUser: isUserPro,
+        prompt:
+          "Please deliver the Affirmative Rebuttal speech supporting the motion.",
+      },
+      {
+        id: 11,
+        speaker: judge,
+        role: "Judge",
+        title: "Judge Transition to Opposition Whip",
+        isUser: false,
+        prompt:
+          "Preside as the judge: synthesize the Affirmative Rebuttal speech, then invite the Opposition Whip next.",
+      },
+      {
+        id: 12,
+        speaker: isUserPro ? whip : { firstName: userName },
+        role: "Opposition Whip",
+        title: "Opposition Whip Speech",
+        isUser: !isUserPro,
+        prompt:
+          "Please deliver the Opposition Whip speech opposing the motion.",
+      },
+      {
+        id: 13,
+        speaker: judge,
+        role: "Judge",
+        title: "Judge Closing & Winner",
+        isUser: false,
+        prompt:
+          "Preside as the judge: summarize the debate, announce the winner, and close the session.",
+      },
     ]
 
-    const step = rolesSequence[turnIndex] || rolesSequence[rolesSequence.length - 1]
+    const step =
+      rolesSequence[turnIndex] || rolesSequence[rolesSequence.length - 1]
     const isLast = turnIndex >= 12
     return { ...step, isLast }
   }
@@ -288,7 +397,8 @@ export default function DebateSession({
     try {
       const tokenRes = await fetch(`/api/sessions/${id}/live-token`)
       if (!tokenRes.ok) throw new Error("Failed to fetch live ephemeral token")
-      const { token, model, systemInstructions, voiceName } = await tokenRes.json()
+      const { token, model, systemInstructions, voiceName } =
+        await tokenRes.json()
 
       const wsUrl = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContentConstrained?access_token=${token}`
       const ws = new WebSocket(wsUrl)
@@ -339,21 +449,26 @@ export default function DebateSession({
               },
             ],
           }))
-          ws.send(JSON.stringify({ clientContent: { turns, turnComplete: true } }))
+          ws.send(
+            JSON.stringify({ clientContent: { turns, turnComplete: true } }),
+          )
           setIsThinking(false)
 
-          const nextStep = getDebateTurnInfo(messages.length, session.userSide || "PRO")
+          const nextStep = getDebateTurnInfo(
+            messages.length,
+            session.userSide || "PRO",
+          )
           setIsUsersTurn(nextStep.isUser)
           setCurrentSpeaker({
             name: getSpeakerName(nextStep.speaker, "You"),
-            title: nextStep.role
+            title: nextStep.role,
           })
         } else {
           // Trigger first turn: Judge Opening
           const currentStep = getDebateTurnInfo(0, session.userSide || "PRO")
           setCurrentSpeaker({
             name: getSpeakerName(currentStep.speaker, "Judge"),
-            title: currentStep.role
+            title: currentStep.role,
           })
           ws.send(
             JSON.stringify({
@@ -435,25 +550,145 @@ export default function DebateSession({
             const playDelay = (nextPlaybackTimeRef.current - now) * 1000
 
             // Sync with end of AI speech
-            setTimeout(async () => {
-              const currentTurnIndex = messagesRef.current.length
-              const currentStep = getDebateTurnInfo(currentTurnIndex, session.userSide || "PRO")
+            setTimeout(
+              async () => {
+                const currentTurnIndex = messagesRef.current.length
+                const currentStep = getDebateTurnInfo(
+                  currentTurnIndex,
+                  session.userSide || "PRO",
+                )
 
-              if (!currentStep.isUser) {
-                // AI Turn finished
-                if (finalOutputText) {
-                  await fetch(`/api/sessions/${id}/messages`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
+                if (!currentStep.isUser) {
+                  // AI Turn finished
+                  if (finalOutputText) {
+                    await fetch(`/api/sessions/${id}/messages`, {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        role: "assistant",
+                        text: finalOutputText,
+                        speakerName: getSpeakerName(
+                          currentStep.speaker,
+                          "Judge",
+                        ),
+                        speakerTitle: currentStep.role,
+                        status: currentStep.isLast
+                          ? "COMPLETED"
+                          : "IN_PROGRESS",
+                        duration: timerRef.current,
+                      }),
+                    })
+
+                    const assistantMsg: Message = {
                       role: "assistant",
-                      text: finalOutputText,
-                      speakerName: getSpeakerName(currentStep.speaker, "Judge"),
-                      speakerTitle: currentStep.role,
-                      status: currentStep.isLast ? "COMPLETED" : "IN_PROGRESS",
-                      duration: timerRef.current,
-                    }),
+                      parts: [
+                        {
+                          type: "text",
+                          text: finalOutputText,
+                          speakerName: getSpeakerName(
+                            currentStep.speaker,
+                            "Judge",
+                          ),
+                          speakerTitle: currentStep.role,
+                          isUsersTurn: false,
+                          audio: { url: null, path: null },
+                        },
+                      ],
+                    }
+                    setMessages((prev) => [...prev, assistantMsg])
+                    accumulatedOutputTextRef.current = ""
+                  }
+
+                  if (currentStep.isLast) {
+                    setSession((prev) =>
+                      prev ? { ...prev, status: "COMPLETED" } : prev,
+                    )
+                    setTimeout(() => handleExit("/debates"), 3000)
+                    return
+                  }
+
+                  const nextTurnIndex = currentTurnIndex + 1
+                  const nextStep = getDebateTurnInfo(
+                    nextTurnIndex,
+                    session.userSide || "PRO",
+                  )
+
+                  setIsUsersTurn(nextStep.isUser)
+                  setCurrentSpeaker({
+                    name: getSpeakerName(nextStep.speaker, "You"),
+                    title: nextStep.role,
                   })
+
+                  if (!nextStep.isUser) {
+                    ws.send(
+                      JSON.stringify({
+                        clientContent: {
+                          turns: [
+                            {
+                              role: "user",
+                              parts: [
+                                {
+                                  text: nextStep.prompt,
+                                },
+                              ],
+                            },
+                          ],
+                          turnComplete: true,
+                        },
+                      }),
+                    )
+                    setIsThinking(true)
+                  }
+                } else {
+                  // User Turn finished & transition model reply finished
+                  const modelTurnIndex = currentTurnIndex + 1
+                  const modelStep = getDebateTurnInfo(
+                    modelTurnIndex,
+                    session.userSide || "PRO",
+                  )
+
+                  if (finalUserText) {
+                    await fetch(`/api/sessions/${id}/messages`, {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        role: "user",
+                        text: finalUserText,
+                        speakerName: authSession?.user?.name || "You",
+                        speakerTitle: currentStep.role,
+                        duration: timerRef.current,
+                      }),
+                    })
+                  }
+
+                  if (finalOutputText) {
+                    await fetch(`/api/sessions/${id}/messages`, {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        role: "assistant",
+                        text: finalOutputText,
+                        speakerName: getSpeakerName(modelStep.speaker, "Judge"),
+                        speakerTitle: modelStep.role,
+                        status: modelStep.isLast ? "COMPLETED" : "IN_PROGRESS",
+                        duration: timerRef.current,
+                      }),
+                    })
+                  }
+
+                  const userMsg: Message = {
+                    role: "user",
+                    parts: [
+                      {
+                        type: "text",
+                        text: finalUserText,
+                        speakerName: authSession?.user?.name || "You",
+                        speakerTitle: currentStep.role,
+                        isUsersTurn: false,
+                        audio: { url: null, path: null },
+                      },
+                    ],
+                  }
 
                   const assistantMsg: Message = {
                     role: "assistant",
@@ -461,156 +696,63 @@ export default function DebateSession({
                       {
                         type: "text",
                         text: finalOutputText,
-                        speakerName: getSpeakerName(currentStep.speaker, "Judge"),
-                        speakerTitle: currentStep.role,
+                        speakerName: getSpeakerName(modelStep.speaker, "Judge"),
+                        speakerTitle: modelStep.role,
                         isUsersTurn: false,
                         audio: { url: null, path: null },
                       },
                     ],
                   }
-                  setMessages((prev) => [...prev, assistantMsg])
+
+                  setMessages((prev) => [...prev, userMsg, assistantMsg])
+                  lastUserTextRef.current = ""
                   accumulatedOutputTextRef.current = ""
-                }
 
-                if (currentStep.isLast) {
-                  setSession((prev) => (prev ? { ...prev, status: "COMPLETED" } : prev))
-                  setTimeout(() => handleExit("/debates"), 3000)
-                  return
-                }
+                  if (modelStep.isLast) {
+                    setSession((prev) =>
+                      prev ? { ...prev, status: "COMPLETED" } : prev,
+                    )
+                    setTimeout(() => handleExit("/debates"), 3000)
+                    return
+                  }
 
-                const nextTurnIndex = currentTurnIndex + 1
-                const nextStep = getDebateTurnInfo(nextTurnIndex, session.userSide || "PRO")
-
-                setIsUsersTurn(nextStep.isUser)
-                setCurrentSpeaker({
-                  name: getSpeakerName(nextStep.speaker, "You"),
-                  title: nextStep.role
-                })
-
-                if (!nextStep.isUser) {
-                  ws.send(
-                    JSON.stringify({
-                      clientContent: {
-                        turns: [
-                          {
-                            role: "user",
-                            parts: [
-                              {
-                                text: nextStep.prompt,
-                              },
-                            ],
-                          },
-                        ],
-                        turnComplete: true,
-                      },
-                    }),
+                  const nextTurnIndex = currentTurnIndex + 2
+                  const nextStep = getDebateTurnInfo(
+                    nextTurnIndex,
+                    session.userSide || "PRO",
                   )
-                  setIsThinking(true)
-                }
-              } else {
-                // User Turn finished & transition model reply finished
-                const modelTurnIndex = currentTurnIndex + 1
-                const modelStep = getDebateTurnInfo(modelTurnIndex, session.userSide || "PRO")
 
-                if (finalUserText) {
-                  await fetch(`/api/sessions/${id}/messages`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                      role: "user",
-                      text: finalUserText,
-                      speakerName: authSession?.user?.name || "You",
-                      speakerTitle: currentStep.role,
-                      duration: timerRef.current,
-                    }),
+                  setIsUsersTurn(nextStep.isUser)
+                  setCurrentSpeaker({
+                    name: getSpeakerName(nextStep.speaker, "You"),
+                    title: nextStep.role,
                   })
+
+                  if (!nextStep.isUser) {
+                    ws.send(
+                      JSON.stringify({
+                        clientContent: {
+                          turns: [
+                            {
+                              role: "user",
+                              parts: [
+                                {
+                                  text: nextStep.prompt,
+                                },
+                              ],
+                            },
+                          ],
+                          turnComplete: true,
+                        },
+                      }),
+                    )
+                    setIsThinking(true)
+                  }
                 }
-
-                if (finalOutputText) {
-                  await fetch(`/api/sessions/${id}/messages`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                      role: "assistant",
-                      text: finalOutputText,
-                      speakerName: getSpeakerName(modelStep.speaker, "Judge"),
-                      speakerTitle: modelStep.role,
-                      status: modelStep.isLast ? "COMPLETED" : "IN_PROGRESS",
-                      duration: timerRef.current,
-                    }),
-                  })
-                }
-
-                const userMsg: Message = {
-                  role: "user",
-                  parts: [
-                    {
-                      type: "text",
-                      text: finalUserText,
-                      speakerName: authSession?.user?.name || "You",
-                      speakerTitle: currentStep.role,
-                      isUsersTurn: false,
-                      audio: { url: null, path: null },
-                    },
-                  ],
-                }
-
-                const assistantMsg: Message = {
-                  role: "assistant",
-                  parts: [
-                    {
-                      type: "text",
-                      text: finalOutputText,
-                      speakerName: getSpeakerName(modelStep.speaker, "Judge"),
-                      speakerTitle: modelStep.role,
-                      isUsersTurn: false,
-                      audio: { url: null, path: null },
-                    },
-                  ],
-                }
-
-                setMessages((prev) => [...prev, userMsg, assistantMsg])
-                lastUserTextRef.current = ""
-                accumulatedOutputTextRef.current = ""
-
-                if (modelStep.isLast) {
-                  setSession((prev) => (prev ? { ...prev, status: "COMPLETED" } : prev))
-                  setTimeout(() => handleExit("/debates"), 3000)
-                  return
-                }
-
-                const nextTurnIndex = currentTurnIndex + 2
-                const nextStep = getDebateTurnInfo(nextTurnIndex, session.userSide || "PRO")
-
-                setIsUsersTurn(nextStep.isUser)
-                setCurrentSpeaker({
-                  name: getSpeakerName(nextStep.speaker, "You"),
-                  title: nextStep.role
-                })
-
-                if (!nextStep.isUser) {
-                  ws.send(
-                    JSON.stringify({
-                      clientContent: {
-                        turns: [
-                          {
-                            role: "user",
-                            parts: [
-                              {
-                                text: nextStep.prompt,
-                              },
-                            ],
-                          },
-                        ],
-                        turnComplete: true,
-                      },
-                    }),
-                  )
-                  setIsThinking(true)
-                }
-              }
-              setIsAiTalking(false)
-            }, Math.max(0, playDelay))
+                setIsAiTalking(false)
+              },
+              Math.max(0, playDelay),
+            )
           }
         } catch (err) {
           console.error("Error processing Gemini response:", err)
@@ -726,11 +868,10 @@ export default function DebateSession({
       micStreamRef.current.getTracks().forEach((track) => track.stop())
       micStreamRef.current = null
     }
-    if (
-      fluxWsRef.current &&
-      fluxWsRef.current.readyState === WebSocket.OPEN
-    ) {
-      fluxWsRef.current.send(JSON.stringify({ realtimeInput: { audioStreamEnd: true } }))
+    if (fluxWsRef.current && fluxWsRef.current.readyState === WebSocket.OPEN) {
+      fluxWsRef.current.send(
+        JSON.stringify({ realtimeInput: { audioStreamEnd: true } }),
+      )
     }
   }
 
@@ -753,8 +894,7 @@ export default function DebateSession({
       setIsRecording(true)
 
       const audioContext = new (
-        window.AudioContext ||
-        (window as any).webkitAudioContext
+        window.AudioContext || (window as any).webkitAudioContext
       )({ sampleRate: 16000 })
       audioContextRef.current = audioContext
 

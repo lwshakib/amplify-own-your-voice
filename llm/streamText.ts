@@ -5,7 +5,10 @@ import { normalizeMessages, Message } from "./utils"
 export interface StreamTextOptions {
   temperature?: number
   systemInstruction?: string
-  onFinish?: (result: { content: string; reasoning?: string }) => Promise<void> | void
+  onFinish?: (result: {
+    content: string
+    reasoning?: string
+  }) => Promise<void> | void
   abortSignal?: AbortSignal
 }
 

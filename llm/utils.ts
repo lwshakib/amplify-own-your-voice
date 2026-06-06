@@ -21,7 +21,8 @@ export function normalizeMessages(
   }
 
   const contents = otherMessages.map((m) => ({
-    role: m.role === "assistant" ? "model" : m.role === "model" ? "model" : "user",
+    role:
+      m.role === "assistant" ? "model" : m.role === "model" ? "model" : "user",
     parts: [{ text: m.content }],
   }))
 
