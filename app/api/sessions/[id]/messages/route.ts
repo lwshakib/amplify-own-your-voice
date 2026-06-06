@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { validateSession } from "@/lib/auth-utils"
-import { aiService } from "@/services/ai.services"
+import { generateObject } from "@/llm/generateObject"
 import { EvaluationSchema } from "@/schemas/common"
 import { Prisma } from "@/generated/prisma/client"
 import { z } from "zod"
@@ -146,7 +146,7 @@ ${historyText}
 CANDIDATE'S LAST ANSWER:
 "${userText}"`
 
-    const evaluationResult = await aiService.generateObject({
+    const evaluationResult = await generateObject({
       messages: [
         {
           role: "system",
