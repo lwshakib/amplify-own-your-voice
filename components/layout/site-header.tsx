@@ -47,7 +47,7 @@ export function SiteHeader() {
     await authClient.signOut({
       fetchOptions: {
         onSuccess: () => {
-          router.push("/sign-in")
+          router.push("/login")
         },
       },
     })

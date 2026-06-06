@@ -16,11 +16,7 @@ export const publicRoutes = ["/"]
  * @type {string[]}
  */
 export const authRoutes = [
-  "/sign-in",
-  "/sign-up",
-  "/forgot-password",
-  "/reset-password",
-  "/verify-email",
+  "/login",
 ]
 
 /**
@@ -69,8 +65,8 @@ export default async function proxy(request: NextRequest) {
 
   // 3. Handle Private Routes
   if (!isLoggedIn && !isPublicRoute) {
-    // Redirect unauthenticated users to sign-in
-    return NextResponse.redirect(new URL("/sign-in", nextUrl))
+    // Redirect unauthenticated users to login
+    return NextResponse.redirect(new URL("/login", nextUrl))
   }
 
   // 4. Pass session user info if authenticated
