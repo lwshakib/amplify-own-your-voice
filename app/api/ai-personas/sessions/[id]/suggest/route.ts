@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
-import { aiService } from "@/services/ai.services"
+import { generateText } from "@/llm/generateText"
 import { ChatBatchSchema } from "@/schemas/chat"
 
 export async function POST(
@@ -80,7 +80,7 @@ Do not include any introductory notes or coaching advice.
 Just the raw response content.
 `
 
-    const text = await aiService.generateText([
+    const text = await generateText([
       { role: "system", content: systemPrompt },
       ...coreMessages,
     ])
