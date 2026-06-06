@@ -3,6 +3,7 @@
 
 import { useEffect, useState, useRef, useCallback } from "react"
 import { useRouter } from "next/navigation"
+import { toast } from "sonner"
 import {
   IconMicrophone,
   IconMicrophoneOff,
@@ -61,6 +62,7 @@ export default function DebateSession({
   const [messages, setMessages] = useState<Message[]>(
     initialSession.messages || [],
   )
+  const messagesRef = useRef(messages)
   const [isRecording, setIsRecording] = useState(false)
   const transcriptRef = useRef("")
   const [isThinking, setIsThinking] = useState(
@@ -115,58 +117,88 @@ export default function DebateSession({
 
   const isInitialized = useRef(false)
   const abortControllerRef = useRef<AbortController | null>(null)
-  const chatAbortControllerRef = useRef<AbortController | null>(null)
-  const audioRef = useRef<HTMLAudioElement | null>(null)
   const isMutedRef = useRef(false)
   const isPausedRef = useRef(false)
-  const pendingTurnChangeRef = useRef<boolean | null>(null)
-  const isThinkingRef = useRef(false)
-  const [audio, setAudio] = useState<HTMLAudioElement | null>(null)
 
   const fluxWsRef = useRef<WebSocket | null>(null)
   const audioContextRef = useRef<AudioContext | null>(null)
   const processorRef = useRef<ScriptProcessorNode | null>(null)
   const micStreamRef = useRef<MediaStream | null>(null)
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
-  const audioChunksRef = useRef<Blob[]>([])
-  const lastPartialRef = useRef("")
 
-  const fetchAsrToken = useCallback(async () => {
+  // Web Audio playback context & scheduling
+  const playbackContextRef = useRef<AudioContext | null>(null)
+  const nextPlaybackTimeRef = useRef<number>(0)
+  const activePlaybackNodes = useRef<Set<AudioBufferSourceNode>>(new Set())
+  const accumulatedOutputTextRef = useRef<string>("")
+  const lastUserTextRef = useRef<string>("")
+
+  const getPlaybackContext = () => {
+    if (!playbackContextRef.current) {
+      playbackContextRef.current = new (
+        window.AudioContext ||
+        (window as any).webkitAudioContext
+      )({ sampleRate: 24000 })
+    }
+    return playbackContextRef.current
+  }
+
+  const playPcmChunk = async (base64Data: string) => {
     try {
-      const res = await fetch("/api/asr/token")
-      if (!res.ok) throw new Error("Failed to get ASR token")
-      const { token } = await res.json()
-      return token
-    } catch (e) {
-      console.error("ASR Token Error:", e)
-      return null
-    }
-  }, [])
+      const ctx = getPlaybackContext()
+      if (!ctx) return
 
-  const stopFluxAsr = useCallback(() => {
-    if (processorRef.current) {
-      processorRef.current.disconnect()
-      processorRef.current = null
+      if (ctx.state === "suspended") {
+        await ctx.resume()
+      }
+
+      const binaryString = window.atob(base64Data)
+      const length = binaryString.length
+      const bytes = new Uint8Array(length)
+      for (let i = 0; i < length; i++) {
+        bytes[i] = binaryString.charCodeAt(i)
+      }
+
+      const int16Array = new Int16Array(bytes.buffer)
+      const float32Array = new Float32Array(int16Array.length)
+      for (let i = 0; i < int16Array.length; i++) {
+        float32Array[i] = int16Array[i] / 32768.0
+      }
+
+      const audioBuffer = ctx.createBuffer(1, float32Array.length, 24000)
+      audioBuffer.getChannelData(0).set(float32Array)
+
+      const source = ctx.createBufferSource()
+      source.buffer = audioBuffer
+      source.connect(ctx.destination)
+
+      const now = ctx.currentTime
+      if (nextPlaybackTimeRef.current < now) {
+        nextPlaybackTimeRef.current = now
+      }
+
+      source.start(nextPlaybackTimeRef.current)
+      nextPlaybackTimeRef.current += audioBuffer.duration
+
+      activePlaybackNodes.current.add(source)
+      source.onended = () => {
+        activePlaybackNodes.current.delete(source)
+      }
+    } catch (error) {
+      console.error("PCM playback error:", error)
     }
-    if (audioContextRef.current) {
-      audioContextRef.current.close()
-      audioContextRef.current = null
-    }
-    if (micStreamRef.current) {
-      micStreamRef.current.getTracks().forEach((t) => t.stop())
-      micStreamRef.current = null
-    }
-    if (fluxWsRef.current) {
-      fluxWsRef.current.close()
-      fluxWsRef.current = null
-    }
-    if (
-      mediaRecorderRef.current &&
-      mediaRecorderRef.current.state !== "inactive"
-    ) {
-      mediaRecorderRef.current.stop()
-    }
-  }, [])
+  }
+
+  const stopAudioPlayback = () => {
+    activePlaybackNodes.current.forEach((node) => {
+      try {
+        node.stop()
+      } catch (e) {}
+    })
+    activePlaybackNodes.current.clear()
+    nextPlaybackTimeRef.current = playbackContextRef.current?.currentTime || 0
+    setIsAiTalking(false)
+    setIsThinking(false)
+  }
 
   const handleToolCalls = useCallback((toolCalls: MessagePart[]) => {
     toolCalls.forEach((tc: MessagePart) => {
@@ -185,19 +217,24 @@ export default function DebateSession({
   }, [])
 
   const stopAll = useCallback(() => {
-    if (abortControllerRef.current) abortControllerRef.current.abort()
-    if (audioRef.current) {
-      audioRef.current.pause()
-      audioRef.current.src = ""
+    stopMicrophoneStreaming()
+    stopAudioPlayback()
+
+    if (fluxWsRef.current) {
+      fluxWsRef.current.close()
+      fluxWsRef.current = null
     }
-    if (captionIntervalRef.current) clearInterval(captionIntervalRef.current)
-    stopFluxAsr()
+    if (playbackContextRef.current) {
+      playbackContextRef.current.close()
+      playbackContextRef.current = null
+    }
+
     setIsRecording(false)
     setIsAiTalking(false)
     setIsThinking(false)
     setIsUserTalking(false)
     setLiveTranscript("")
-  }, [stopFluxAsr])
+  }, [])
 
   const handleExit = useCallback(
     (path: string) => {
@@ -207,432 +244,397 @@ export default function DebateSession({
     [stopAll, router],
   )
 
-  const fetchAiResponse = useCallback(
-    async (history: Message[], audioUrl?: string, audioPath?: string) => {
-      try {
-        if (chatAbortControllerRef.current)
-          chatAbortControllerRef.current.abort()
-        chatAbortControllerRef.current = new AbortController()
+  const getDebateTurnInfo = (turnIndex: number, userSide: string) => {
+    const judge = judgeChar
+    const lead = leadChar
+    const deputy = deputyChar
+    const whip = whipChar
+    const userName = authSession?.user?.name || "You"
+    const isUserPro = userSide === "PRO"
 
-        const response = await fetch(`/api/sessions/${id}/chat`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            messages: history,
-            duration: timerRef.current,
-            audioUrl,
-            audioPath,
-          }),
-          signal: chatAbortControllerRef.current.signal,
-        })
-        if (!response.ok) throw new Error("Failed to fetch AI response")
-        const data = await response.json()
+    const rolesSequence = [
+      { id: 1, speaker: judge, role: "Judge", title: "Judge Opening", isUser: false, prompt: "Please start the debate by presenting and welcoming the audience, then invite the Prime Minister." },
+      { id: 2, speaker: isUserPro ? { firstName: userName } : lead, role: "Prime Minister", title: "Prime Minister Speech", isUser: isUserPro, prompt: "Please deliver the Prime Minister opening speech supporting the motion." },
+      { id: 3, speaker: judge, role: "Judge", title: "Judge Transition to Lead Opponent", isUser: false, prompt: "Preside as the judge: synthesize the Prime Minister's speech, then invite the Leader of Opposition to speak next." },
+      { id: 4, speaker: isUserPro ? lead : { firstName: userName }, role: "Leader of Opposition", title: "Leader of Opposition Speech", isUser: !isUserPro, prompt: "Please deliver the Leader of Opposition opening speech opposing the motion." },
+      { id: 5, speaker: judge, role: "Judge", title: "Judge Transition to Deputy PM", isUser: false, prompt: "Preside as the judge: synthesize the Leader of Opposition's speech, then invite the Deputy Prime Minister to speak next." },
+      { id: 6, speaker: isUserPro ? { firstName: userName } : deputy, role: "Deputy Prime Minister", title: "Deputy Prime Minister Speech", isUser: isUserPro, prompt: "Please deliver the Deputy Prime Minister speech supporting the motion." },
+      { id: 7, speaker: judge, role: "Judge", title: "Judge Transition to Deputy LO", isUser: false, prompt: "Preside as the judge: synthesize the Deputy Prime Minister's speech, then invite the Deputy Leader of Opposition to speak next." },
+      { id: 8, speaker: isUserPro ? deputy : { firstName: userName }, role: "Deputy Leader of Opposition", title: "Deputy Leader of Opposition Speech", isUser: !isUserPro, prompt: "Please deliver the Deputy Leader of Opposition speech opposing the motion." },
+      { id: 9, speaker: judge, role: "Judge", title: "Judge Transition to Affirmative Rebuttal", isUser: false, prompt: "Preside as the judge: synthesize the Deputy Leader of Opposition's speech, then invite the Affirmative Rebuttal speaker next." },
+      { id: 10, speaker: isUserPro ? { firstName: userName } : whip, role: "Affirmative Rebuttal", title: "Affirmative Rebuttal Speech", isUser: isUserPro, prompt: "Please deliver the Affirmative Rebuttal speech supporting the motion." },
+      { id: 11, speaker: judge, role: "Judge", title: "Judge Transition to Opposition Whip", isUser: false, prompt: "Preside as the judge: synthesize the Affirmative Rebuttal speech, then invite the Opposition Whip next." },
+      { id: 12, speaker: isUserPro ? whip : { firstName: userName }, role: "Opposition Whip", title: "Opposition Whip Speech", isUser: !isUserPro, prompt: "Please deliver the Opposition Whip speech opposing the motion." },
+      { id: 13, speaker: judge, role: "Judge", title: "Judge Closing & Winner", isUser: false, prompt: "Preside as the judge: summarize the debate, announce the winner, and close the session." }
+    ]
 
-        const textPart = data.parts?.find(
-          (p: { type: string }) => p.type === "text",
-        )
-        const toolCalls =
-          data.parts?.filter((p: { type: string }) => p.type === "tool") || []
+    const step = rolesSequence[turnIndex] || rolesSequence[rolesSequence.length - 1]
+    const isLast = turnIndex >= 12
+    return { ...step, isLast }
+  }
 
-        return {
-          text: textPart?.text || "",
-          status: data.status,
-          audioUrl: textPart?.audio?.url,
-          audioPath: textPart?.audio?.path,
-          speakerName: textPart?.speakerName || "Agent",
-          speakerTitle: textPart?.speakerTitle || "Moderator",
-          isUsersTurn: textPart?.isUsersTurn ?? false,
-          toolCalls: toolCalls.length > 0 ? (toolCalls as MessagePart[]) : [],
-          userMessageId: data.userMessageId,
-          evaluation: data.evaluation,
-        }
-      } catch (error: unknown) {
-        if ((error as { name?: string }).name === "AbortError") return null
-        console.error("AI Error:", error)
-        return null
-      }
-    },
-    [id],
-  )
+  const getSpeakerName = (speaker?: any, fallback = "You") => {
+    if (!speaker) return fallback
+    return `${speaker.firstName || ""} ${speaker.lastName || ""}`.trim()
+  }
 
-  const speak = useCallback(
-    async (
-      text: string,
-      isCompleted: boolean = false,
-      speakerName?: string,
-      speakerTitle?: string,
-      audioUrl?: string,
-    ) => {
-      if (audio) {
-        audio.pause()
-        audio.src = ""
-      }
+  // Connect to Gemini Live over WebSocket
+  const connectGeminiLive = useCallback(async () => {
+    if (isInitialized.current) return
+    isInitialized.current = true
 
-      try {
-        isThinkingRef.current = true
-        setIsThinking(true)
-        if (!audioUrl) return
-        const url = audioUrl
-        const newAudio = new Audio(url)
-
-        newAudio.onplay = () => {
-          setIsAiTalking(true)
-          isThinkingRef.current = false
-          setIsThinking(false)
-          const words = text.split(/\s+/)
-          const wordsPerChunk = 5
-          const chunks: string[] = []
-          for (let i = 0; i < words.length; i += wordsPerChunk)
-            chunks.push(words.slice(i, i + wordsPerChunk).join(" "))
-          if (chunks.length > 0) {
-            let currentChunkIdx = 0
-            const totalDurationMs = newAudio.duration
-              ? newAudio.duration * 1000
-              : words.length * 350
-            const msPerChunk = (totalDurationMs - 200) / chunks.length
-            if (captionIntervalRef.current)
-              clearInterval(captionIntervalRef.current)
-            captionIntervalRef.current = setInterval(
-              () => {
-                currentChunkIdx++
-                if (currentChunkIdx < chunks.length) {
-                } else if (captionIntervalRef.current)
-                  clearInterval(captionIntervalRef.current)
-              },
-              Math.max(msPerChunk, 500),
-            )
-          }
-        }
-        newAudio.onended = () => {
-          setIsAiTalking(false)
-          isThinkingRef.current = false
-          setIsThinking(false)
-          if (captionIntervalRef.current)
-            clearInterval(captionIntervalRef.current)
-          if (!audioUrl && url) URL.revokeObjectURL(url)
-          setCurrentSpeaker({ name: "", title: "" })
-
-          if (pendingTurnChangeRef.current !== null) {
-            setIsUsersTurn(pendingTurnChangeRef.current)
-            pendingTurnChangeRef.current = null
-          }
-
-          if (isCompleted) {
-            setSession((prev) =>
-              prev ? { ...prev, status: "COMPLETED" } : prev,
-            )
-            setTimeout(() => handleExit("/sessions"), 3000)
-          }
-        }
-        audioRef.current = newAudio
-        setAudio(newAudio)
-        newAudio.play().catch((e) => {
-          if (e.name === "AbortError") return
-          setIsAiTalking(false)
-          isThinkingRef.current = false
-          setIsThinking(false)
-          if (pendingTurnChangeRef.current !== null) {
-            setIsUsersTurn(pendingTurnChangeRef.current)
-            pendingTurnChangeRef.current = null
-          }
-        })
-      } catch (error) {
-        console.error(error)
-        setIsAiTalking(false)
-        isThinkingRef.current = false
-        setIsThinking(false)
-      }
-    },
-    [audio, handleExit],
-  )
-
-  const startAiDebate = useCallback(async () => {
     setIsThinking(true)
-    const aiResponse = await fetchAiResponse([])
-    if (aiResponse) {
-      isInitialized.current = true
-      const assistantMsg: Message = {
-        role: "assistant",
-        parts: [
-          {
-            type: "text" as const,
-            text: aiResponse.text,
-            speakerName: aiResponse.speakerName,
-            speakerTitle: aiResponse.speakerTitle,
-            isUsersTurn: !!aiResponse.isUsersTurn,
-            audio: {
-              url: aiResponse.audioUrl,
-              path: aiResponse.audioPath,
+
+    try {
+      const tokenRes = await fetch(`/api/sessions/${id}/live-token`)
+      if (!tokenRes.ok) throw new Error("Failed to fetch live ephemeral token")
+      const { token, model, systemInstructions, voiceName } = await tokenRes.json()
+
+      const wsUrl = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContentConstrained?access_token=${token}`
+      const ws = new WebSocket(wsUrl)
+      fluxWsRef.current = ws
+
+      ws.onopen = () => {
+        // Send setup configuration
+        const setupMsg = {
+          setup: {
+            model: `models/${model}`,
+            generationConfig: {
+              responseModalities: ["AUDIO"],
+              speechConfig: {
+                voiceConfig: {
+                  prebuiltVoiceConfig: {
+                    voiceName,
+                  },
+                },
+              },
+            },
+            systemInstruction: {
+              parts: [{ text: systemInstructions }],
+            },
+            inputAudioTranscription: {},
+            outputAudioTranscription: {},
+            realtimeInputConfig: {
+              automaticActivityDetection: {
+                disabled: false,
+                silenceDurationMs: 2000,
+                prefixPaddingMs: 500,
+              },
             },
           },
-          ...(aiResponse.toolCalls
-            ? aiResponse.toolCalls.map((tc: MessagePart) => ({
-                type: "tool" as const,
-                name: (tc.name || tc.tool?.name || "") as string,
-                parameters: (tc.parameters ||
-                  tc.tool?.parameters ||
-                  {}) as Record<string, unknown>,
-              }))
-            : []),
-        ],
-      }
-      setMessages([assistantMsg])
-      setCurrentSpeaker({
-        name: aiResponse.speakerName,
-        title: aiResponse.speakerTitle,
-      })
+        }
+        ws.send(JSON.stringify(setupMsg))
 
-      if (aiResponse.isUsersTurn) {
-        pendingTurnChangeRef.current = true
-      } else {
-        setIsUsersTurn(false)
-        pendingTurnChangeRef.current = null
-      }
+        // Seed initial history or prompt to greet
+        if (messages.length > 0) {
+          const turns = messages.map((m) => ({
+            role: m.role === "user" ? "user" : "model",
+            parts: [
+              {
+                text:
+                  typeof m.parts === "string"
+                    ? m.parts
+                    : (m.parts as MessagePart[])?.find((p) => p.type === "text")
+                        ?.text || "",
+              },
+            ],
+          }))
+          ws.send(JSON.stringify({ clientContent: { turns, turnComplete: true } }))
+          setIsThinking(false)
 
-      if (aiResponse.toolCalls && Array.isArray(aiResponse.toolCalls)) {
-        handleToolCalls(aiResponse.toolCalls)
-      }
-
-      speak(
-        aiResponse.text,
-        aiResponse.status === "COMPLETED" || aiResponse.status === "Completed",
-        aiResponse.speakerName,
-        aiResponse.speakerTitle,
-        aiResponse.audioUrl,
-      )
-    } else {
-      setIsThinking(false)
-    }
-  }, [fetchAiResponse, handleToolCalls, speak])
-
-  // Suggestion Cleanup
-  useEffect(() => {
-    if (!isUsersTurn) {
-      setSuggestedText("")
-    }
-  }, [isUsersTurn])
-
-  // Timer Effect
-  useEffect(() => {
-    let interval: NodeJS.Timeout
-    if (session?.status !== "COMPLETED") {
-      interval = setInterval(() => {
-        setTimer((prev) => {
-          const next = prev + 1
-          timerRef.current = next
-          return next
-        })
-      }, 1000)
-    }
-    return () => clearInterval(interval)
-  }, [session?.status])
-
-  // Sync refs with state
-  useEffect(() => {
-    isMutedRef.current = isMuted
-    isPausedRef.current = isPaused
-  }, [isMuted, isPaused])
-
-  useEffect(() => {
-    if (isInitialized.current && messages.length > 0) return
-
-    if (session.userSide) {
-      if (messages.length > 0) {
-        isInitialized.current = true
-        const lastMsg: Message = messages[messages.length - 1]
-        if (lastMsg.role === "assistant") {
-          const textPart = Array.isArray(lastMsg.parts)
-            ? (lastMsg.parts as MessagePart[]).find((p) => p.type === "text")
-            : null
-          const speakerName =
-            (textPart as MessagePart)?.speakerName ||
-            (lastMsg as ExtendedMessage).speakerName ||
-            "AI"
-          const speakerTitle =
-            (textPart as MessagePart)?.speakerTitle ||
-            (lastMsg as ExtendedMessage).speakerTitle ||
-            "Moderator"
-          const audioUrl =
-            textPart?.audio?.url ||
-            (lastMsg as Message & { audioUrl?: string }).audioUrl
-
-          setCurrentSpeaker({ name: speakerName, title: speakerTitle })
-          setIsUsersTurn(
-            !!(
-              (textPart as MessagePart)?.isUsersTurn ??
-              (lastMsg as ExtendedMessage).isUsersTurn
-            ),
+          const nextStep = getDebateTurnInfo(messages.length, session.userSide || "PRO")
+          setIsUsersTurn(nextStep.isUser)
+          setCurrentSpeaker({
+            name: getSpeakerName(nextStep.speaker, "You"),
+            title: nextStep.role
+          })
+        } else {
+          // Trigger first turn: Judge Opening
+          const currentStep = getDebateTurnInfo(0, session.userSide || "PRO")
+          setCurrentSpeaker({
+            name: getSpeakerName(currentStep.speaker, "Judge"),
+            title: currentStep.role
+          })
+          ws.send(
+            JSON.stringify({
+              clientContent: {
+                turns: [
+                  {
+                    role: "user",
+                    parts: [
+                      {
+                        text: currentStep.prompt,
+                      },
+                    ],
+                  },
+                ],
+                turnComplete: true,
+              },
+            }),
           )
+        }
+      }
 
-          const toolCalls = Array.isArray(lastMsg.parts)
-            ? (lastMsg.parts as MessagePart[]).filter((p) => p.type === "tool")
-            : []
+      ws.onmessage = async (event) => {
+        if (isPausedRef.current) return
 
-          if (toolCalls.length > 0) {
-            handleToolCalls(toolCalls)
+        let jsonData
+        if (event.data instanceof Blob) {
+          jsonData = await event.data.text()
+        } else if (event.data instanceof ArrayBuffer) {
+          jsonData = new TextDecoder().decode(event.data)
+        } else {
+          jsonData = event.data
+        }
+
+        try {
+          const response = JSON.parse(jsonData)
+
+          // Handle interruption
+          if (response.serverContent?.interrupted) {
+            console.log("Interruption detected")
+            stopAudioPlayback()
+            return
           }
 
-          const textToSpeak =
-            textPart?.text ||
-            (typeof lastMsg.parts === "string" ? lastMsg.parts : "")
+          // Play incoming audio chunks
+          const parts = response.serverContent?.modelTurn?.parts
+          if (parts) {
+            for (const part of parts) {
+              if (part.inlineData?.data) {
+                playPcmChunk(part.inlineData.data)
+                setIsAiTalking(true)
+                setIsThinking(false)
+              }
+            }
+          }
 
-          speak(
-            textToSpeak,
-            lastMsg.status === "COMPLETED" || lastMsg.status === "Completed",
-            speakerName,
-            speakerTitle,
-            audioUrl,
-          )
+          // Handle input transcription (user speaking)
+          if (response.serverContent?.inputTranscription) {
+            const userText = response.serverContent.inputTranscription.text
+            if (userText) {
+              setLiveTranscript(userText)
+              lastUserTextRef.current = userText
+            }
+          }
+
+          // Handle output transcription (model speaking)
+          if (response.serverContent?.outputTranscription) {
+            const outputText = response.serverContent.outputTranscription.text
+            if (outputText) {
+              accumulatedOutputTextRef.current += outputText
+            }
+          }
+
+          // Handle turn complete
+          if (response.serverContent?.turnComplete) {
+            const finalUserText = lastUserTextRef.current.trim()
+            const finalOutputText = accumulatedOutputTextRef.current.trim()
+
+            const now = playbackContextRef.current?.currentTime || 0
+            const playDelay = (nextPlaybackTimeRef.current - now) * 1000
+
+            // Sync with end of AI speech
+            setTimeout(async () => {
+              const currentTurnIndex = messagesRef.current.length
+              const currentStep = getDebateTurnInfo(currentTurnIndex, session.userSide || "PRO")
+
+              if (!currentStep.isUser) {
+                // AI Turn finished
+                if (finalOutputText) {
+                  await fetch(`/api/sessions/${id}/messages`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      role: "assistant",
+                      text: finalOutputText,
+                      speakerName: getSpeakerName(currentStep.speaker, "Judge"),
+                      speakerTitle: currentStep.role,
+                      status: currentStep.isLast ? "COMPLETED" : "IN_PROGRESS",
+                      duration: timerRef.current,
+                    }),
+                  })
+
+                  const assistantMsg: Message = {
+                    role: "assistant",
+                    parts: [
+                      {
+                        type: "text",
+                        text: finalOutputText,
+                        speakerName: getSpeakerName(currentStep.speaker, "Judge"),
+                        speakerTitle: currentStep.role,
+                        isUsersTurn: false,
+                        audio: { url: null, path: null },
+                      },
+                    ],
+                  }
+                  setMessages((prev) => [...prev, assistantMsg])
+                  accumulatedOutputTextRef.current = ""
+                }
+
+                if (currentStep.isLast) {
+                  setSession((prev) => (prev ? { ...prev, status: "COMPLETED" } : prev))
+                  setTimeout(() => handleExit("/debates"), 3000)
+                  return
+                }
+
+                const nextTurnIndex = currentTurnIndex + 1
+                const nextStep = getDebateTurnInfo(nextTurnIndex, session.userSide || "PRO")
+
+                setIsUsersTurn(nextStep.isUser)
+                setCurrentSpeaker({
+                  name: getSpeakerName(nextStep.speaker, "You"),
+                  title: nextStep.role
+                })
+
+                if (!nextStep.isUser) {
+                  ws.send(
+                    JSON.stringify({
+                      clientContent: {
+                        turns: [
+                          {
+                            role: "user",
+                            parts: [
+                              {
+                                text: nextStep.prompt,
+                              },
+                            ],
+                          },
+                        ],
+                        turnComplete: true,
+                      },
+                    }),
+                  )
+                  setIsThinking(true)
+                }
+              } else {
+                // User Turn finished & transition model reply finished
+                const modelTurnIndex = currentTurnIndex + 1
+                const modelStep = getDebateTurnInfo(modelTurnIndex, session.userSide || "PRO")
+
+                if (finalUserText) {
+                  await fetch(`/api/sessions/${id}/messages`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      role: "user",
+                      text: finalUserText,
+                      speakerName: authSession?.user?.name || "You",
+                      speakerTitle: currentStep.role,
+                      duration: timerRef.current,
+                    }),
+                  })
+                }
+
+                if (finalOutputText) {
+                  await fetch(`/api/sessions/${id}/messages`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      role: "assistant",
+                      text: finalOutputText,
+                      speakerName: getSpeakerName(modelStep.speaker, "Judge"),
+                      speakerTitle: modelStep.role,
+                      status: modelStep.isLast ? "COMPLETED" : "IN_PROGRESS",
+                      duration: timerRef.current,
+                    }),
+                  })
+                }
+
+                const userMsg: Message = {
+                  role: "user",
+                  parts: [
+                    {
+                      type: "text",
+                      text: finalUserText,
+                      speakerName: authSession?.user?.name || "You",
+                      speakerTitle: currentStep.role,
+                      isUsersTurn: false,
+                      audio: { url: null, path: null },
+                    },
+                  ],
+                }
+
+                const assistantMsg: Message = {
+                  role: "assistant",
+                  parts: [
+                    {
+                      type: "text",
+                      text: finalOutputText,
+                      speakerName: getSpeakerName(modelStep.speaker, "Judge"),
+                      speakerTitle: modelStep.role,
+                      isUsersTurn: false,
+                      audio: { url: null, path: null },
+                    },
+                  ],
+                }
+
+                setMessages((prev) => [...prev, userMsg, assistantMsg])
+                lastUserTextRef.current = ""
+                accumulatedOutputTextRef.current = ""
+
+                if (modelStep.isLast) {
+                  setSession((prev) => (prev ? { ...prev, status: "COMPLETED" } : prev))
+                  setTimeout(() => handleExit("/debates"), 3000)
+                  return
+                }
+
+                const nextTurnIndex = currentTurnIndex + 2
+                const nextStep = getDebateTurnInfo(nextTurnIndex, session.userSide || "PRO")
+
+                setIsUsersTurn(nextStep.isUser)
+                setCurrentSpeaker({
+                  name: getSpeakerName(nextStep.speaker, "You"),
+                  title: nextStep.role
+                })
+
+                if (!nextStep.isUser) {
+                  ws.send(
+                    JSON.stringify({
+                      clientContent: {
+                        turns: [
+                          {
+                            role: "user",
+                            parts: [
+                              {
+                                text: nextStep.prompt,
+                              },
+                            ],
+                          },
+                        ],
+                        turnComplete: true,
+                      },
+                    }),
+                  )
+                  setIsThinking(true)
+                }
+              }
+              setIsAiTalking(false)
+            }, Math.max(0, playDelay))
+          }
+        } catch (err) {
+          console.error("Error processing Gemini response:", err)
         }
-      } else {
-        startAiDebate()
       }
-    }
-  }, [
-    session.userSide,
-    messages,
-    handleToolCalls,
-    speak,
-    startAiDebate,
-    session,
-  ])
 
-  // Prefetch next AI response while current AI is talking
-  useEffect(() => {
-    // Determine if the last message already signaled a user turn
-    const lastMsg = messages[messages.length - 1]
-    const isNextStepUser =
-      lastMsg?.role === "assistant" &&
-      (Array.isArray(lastMsg.parts)
-        ? (lastMsg.parts as MessagePart[]).some((p) => p.isUsersTurn)
-        : (lastMsg as ExtendedMessage).isUsersTurn)
-
-    if (
-      !isUsersTurn &&
-      isAiTalking &&
-      !isPrefetching &&
-      !prefetchedData &&
-      !isThinking &&
-      session?.status !== "COMPLETED" &&
-      !showSideSelection &&
-      !isNextStepUser
-    ) {
-      setIsPrefetching(true)
-      fetchAiResponse(messages).then((aiData) => {
-        if (aiData && aiData.text) {
-          setPrefetchedData(aiData)
-        }
-        setIsPrefetching(false)
-      })
-    }
-  }, [
-    isUsersTurn,
-    isAiTalking,
-    isPrefetching,
-    prefetchedData,
-    isThinking,
-    messages,
-    session?.status,
-    showSideSelection,
-    fetchAiResponse,
-  ])
-
-  // Auto-trigger AI moves
-  useEffect(() => {
-    if (
-      isUsersTurn ||
-      isAiTalking ||
-      isThinking ||
-      isThinkingRef.current ||
-      !session ||
-      session.status === "COMPLETED" ||
-      showSideSelection ||
-      isPrefetching
-    )
-      return
-    const triggerNext = async () => {
-      isThinkingRef.current = true
-      setIsThinking(true)
-      setCurrentSpeaker({ name: "", title: "" }) // Clear highlight while thinking
-
-      let aiData = prefetchedData
-      if (aiData) {
-        setPrefetchedData(null)
-      } else {
-        aiData = await fetchAiResponse(messages)
-      }
-
-      if (aiData && aiData.text) {
-        const assistantMsg: Message = {
-          role: "assistant",
-          parts: [
-            {
-              type: "text" as const,
-              text: aiData.text as string,
-              speakerName: aiData.speakerName as string,
-              speakerTitle: aiData.speakerTitle as string,
-              isUsersTurn: !!aiData.isUsersTurn,
-              audio: {
-                url: aiData.audioUrl as string | null,
-                path: aiData.audioPath as string | null,
-              },
-            },
-            ...(aiData.toolCalls
-              ? (aiData.toolCalls as MessagePart[]).map((tc) => ({
-                  type: "tool" as const,
-                  name: (tc.name || tc.tool?.name || "") as string,
-                  parameters: (tc.parameters ||
-                    tc.tool?.parameters ||
-                    {}) as Record<string, unknown>,
-                }))
-              : []),
-          ],
-        }
-        setMessages((prev) => [...prev, assistantMsg])
-        setCurrentSpeaker({
-          name: aiData.speakerName as string,
-          title: aiData.speakerTitle as string,
-        })
-
-        // Delay setting isUsersTurn until the speech ends
-        if (aiData.isUsersTurn) {
-          pendingTurnChangeRef.current = true
-        } else {
-          setIsUsersTurn(false)
-          pendingTurnChangeRef.current = null
-        }
-
-        if (aiData.toolCalls && Array.isArray(aiData.toolCalls)) {
-          handleToolCalls(aiData.toolCalls as MessagePart[])
-        }
-
-        speak(
-          aiData.text as string,
-          aiData.status === "COMPLETED" || aiData.status === "Completed",
-          aiData.speakerName as string,
-          aiData.speakerTitle as string,
-          aiData.audioUrl as string,
-        )
-      } else {
-        isThinkingRef.current = false
+      ws.onerror = (err) => {
+        console.error("Gemini Live WebSocket error:", err)
         setIsThinking(false)
       }
+
+      ws.onclose = () => {
+        console.log("Gemini Live WebSocket closed")
+        setIsThinking(false)
+      }
+    } catch (error) {
+      console.error("Failed to connect to Gemini Live API:", error)
+      setIsThinking(false)
     }
-    triggerNext() // Execute instantly when AI is done streaming the final segment
-  }, [
-    id,
-    isUsersTurn,
-    isAiTalking,
-    isThinking,
-    session,
-    messages,
-    fetchAiResponse,
-    handleToolCalls,
-    speak,
-    prefetchedData,
-    isPrefetching,
-    showSideSelection,
-  ])
+  }, [id, session, authSession])
+
+  const startAiDebate = useCallback(() => {
+    connectGeminiLive()
+  }, [connectGeminiLive])
 
   const handleConfirmSide = async () => {
     if (!selectedSide) return
@@ -711,14 +713,35 @@ export default function DebateSession({
     }
   }
 
-  const startFluxAsr = async () => {
-    const token = await fetchAsrToken()
-    if (!token) return
+  const stopMicrophoneStreaming = () => {
+    if (processorRef.current) {
+      processorRef.current.disconnect()
+      processorRef.current = null
+    }
+    if (audioContextRef.current) {
+      audioContextRef.current.close()
+      audioContextRef.current = null
+    }
+    if (micStreamRef.current) {
+      micStreamRef.current.getTracks().forEach((track) => track.stop())
+      micStreamRef.current = null
+    }
+    if (
+      fluxWsRef.current &&
+      fluxWsRef.current.readyState === WebSocket.OPEN
+    ) {
+      fluxWsRef.current.send(JSON.stringify({ realtimeInput: { audioStreamEnd: true } }))
+    }
+  }
 
-    const workerUrl = `${process.env.NEXT_PUBLIC_FLUX_WORKER_URL || "wss://flux.leadwithshakib.workers.dev/"}?token=${token}`
+  const startMicrophoneStreaming = async () => {
+    if (!fluxWsRef.current || fluxWsRef.current.readyState !== WebSocket.OPEN) {
+      toast.error("WebSocket connection is not open.")
+      return
+    }
 
     try {
-      micStreamRef.current = await navigator.mediaDevices.getUserMedia({
+      const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           sampleRate: 16000,
           channelCount: 1,
@@ -726,187 +749,71 @@ export default function DebateSession({
         },
       })
 
-      fluxWsRef.current = new WebSocket(workerUrl)
+      micStreamRef.current = stream
+      setIsRecording(true)
 
-      fluxWsRef.current.onopen = () => {
-        const audioContext = new (
-          window.AudioContext ||
-          (window as unknown as { webkitAudioContext: typeof AudioContext })
-            .webkitAudioContext
-        )({ sampleRate: 16000 })
-        audioContextRef.current = audioContext
+      const audioContext = new (
+        window.AudioContext ||
+        (window as any).webkitAudioContext
+      )({ sampleRate: 16000 })
+      audioContextRef.current = audioContext
 
-        const source = audioContext.createMediaStreamSource(
-          micStreamRef.current!,
-        )
-        const processor = audioContext.createScriptProcessor(4096, 1, 1)
-        processorRef.current = processor
+      const source = audioContext.createMediaStreamSource(stream)
+      const processor = audioContext.createScriptProcessor(4096, 1, 1)
+      processorRef.current = processor
 
-        processor.onaudioprocess = (e) => {
-          if (
-            fluxWsRef.current?.readyState === WebSocket.OPEN &&
-            !isMutedRef.current &&
-            !isPausedRef.current
-          ) {
-            const inputData = e.inputBuffer.getChannelData(0)
-            const pcmData = new Int16Array(inputData.length)
-            for (let i = 0; i < inputData.length; i++) {
-              pcmData[i] = Math.max(-1, Math.min(1, inputData[i])) * 0x7fff
-            }
-            fluxWsRef.current.send(pcmData.buffer)
+      processor.onaudioprocess = (e) => {
+        if (
+          fluxWsRef.current?.readyState === WebSocket.OPEN &&
+          !isMutedRef.current &&
+          !isPausedRef.current
+        ) {
+          const inputData = e.inputBuffer.getChannelData(0)
+          const pcmData = new Int16Array(inputData.length)
+          for (let i = 0; i < inputData.length; i++) {
+            pcmData[i] = Math.max(-1, Math.min(1, inputData[i])) * 0x7fff
           }
-        }
 
-        source.connect(processor)
-        processor.connect(audioContext.destination)
-
-        // Standard MediaRecorder for higher quality audio upload
-        const mediaRecorder = new MediaRecorder(micStreamRef.current!)
-        mediaRecorderRef.current = mediaRecorder
-        audioChunksRef.current = []
-        mediaRecorder.ondataavailable = (e) => {
-          if (e.data.size > 0) audioChunksRef.current.push(e.data)
-        }
-        mediaRecorder.start()
-      }
-
-      if (fluxWsRef.current) {
-        fluxWsRef.current.onmessage = (e: MessageEvent) => {
-          if (isPausedRef.current) return
-          try {
-            const data = JSON.parse(e.data)
-            if (data.transcript) {
-              const clean = data.transcript.trim()
-              if (clean) {
-                if (
-                  lastPartialRef.current &&
-                  data.transcript.length <
-                    lastPartialRef.current.length * 0.7 &&
-                  !data.transcript
-                    .toLowerCase()
-                    .startsWith(
-                      lastPartialRef.current.toLowerCase().substring(0, 5),
-                    )
-                ) {
-                  transcriptRef.current += lastPartialRef.current + " "
-                  lastPartialRef.current = ""
-                }
-
-                lastPartialRef.current = data.transcript
-                const currentFull = (
-                  transcriptRef.current +
-                  " " +
-                  data.transcript
-                )
-                  .replace(/\s+/g, " ")
-                  .trim()
-                setLiveTranscript(currentFull)
-
-                if (!isMutedRef.current && data.is_final) {
-                  transcriptRef.current =
-                    (transcriptRef.current + " " + data.transcript)
-                      .replace(/\s+/g, " ")
-                      .trim() + " "
-                  lastPartialRef.current = ""
-                  setLiveTranscript(transcriptRef.current)
-                }
-              }
-            }
-          } catch (err) {
-            console.error("ASR Data Error:", err)
+          let binary = ""
+          const bytes = new Uint8Array(pcmData.buffer)
+          for (let i = 0; i < bytes.byteLength; i++) {
+            binary += String.fromCharCode(bytes[i])
           }
+          const base64Audio = window.btoa(binary)
+
+          fluxWsRef.current.send(
+            JSON.stringify({
+              realtimeInput: {
+                audio: {
+                  data: base64Audio,
+                  mimeType: "audio/pcm;rate=16000",
+                },
+              },
+            }),
+          )
         }
       }
 
-      if (fluxWsRef.current) {
-        fluxWsRef.current.onerror = (err) => console.error("ASR WS Error:", err)
-        fluxWsRef.current.onclose = () => stopFluxAsr()
-      }
+      source.connect(processor)
+      processor.connect(audioContext.destination)
     } catch (e) {
-      console.error("Mic Access Error:", e)
+      console.error("Failed to access microphone:", e)
+      toast.error("Could not access microphone.")
     }
   }
 
   const startRecording = () => {
     transcriptRef.current = ""
-    lastPartialRef.current = ""
+    lastUserTextRef.current = ""
     setLiveTranscript("")
-    const turnIndex = messages.length
-
-    // Determine the user's role based on the debate sequence
-    const turnToTitleMap: Record<number, string> = {
-      1: "Prime Minister",
-      3: "Leader of Opposition",
-      5: "Deputy Prime Minister",
-      7: "Deputy Leader of Opposition",
-      9: "Affirmative Rebuttal",
-      11: "Opposition Whip",
-    }
-    const myRole = turnToTitleMap[turnIndex] || ""
-    setCurrentSpeaker({ name: authSession?.user?.name || "You", title: myRole })
-
-    setIsRecording(true)
-    startFluxAsr()
-    // Browser SpeechRecognition removed since unused as per lint
-    // startFluxAsr() handles it.
+    startMicrophoneStreaming()
   }
 
-  const stopAndSubmit = async () => {
-    const finalTranscript = (
-      transcriptRef.current +
-      " " +
-      (lastPartialRef.current || "")
-    )
-      .replace(/\s+/g, " ")
-      .trim()
+  const stopAndSubmit = () => {
     setIsRecording(false)
-    // recognition?.stop() removed since unused
-
-    const audioUploadingPromise = (async () => {
-      if (
-        mediaRecorderRef.current &&
-        mediaRecorderRef.current.state !== "inactive"
-      ) {
-        const audioPromise = new Promise<Blob>((resolve) => {
-          mediaRecorderRef.current!.onstop = () => {
-            const blob = new Blob(audioChunksRef.current, {
-              type: "audio/webm",
-            })
-            resolve(blob)
-          }
-        })
-        mediaRecorderRef.current.stop()
-        const audioBlob = await audioPromise
-        try {
-          const { uploadToS3Client } = await import("@/lib/s3-client")
-          const path = await uploadToS3Client(audioBlob, "audio")
-
-          // Get a signed URL for immediate playback
-          const res = await fetch(
-            `/api/s3/signed-url?path=${encodeURIComponent(path)}`,
-          )
-          const { url } = await res.json()
-
-          return { url, path }
-        } catch (err) {
-          console.error("Failed to upload user audio to S3:", err)
-          return null
-        }
-      }
-      return null
-    })()
-
-    stopFluxAsr()
+    stopMicrophoneStreaming()
     setIsMuted(false)
     setIsPaused(false)
-
-    if (finalTranscript) {
-      handleUserResponse(finalTranscript, audioUploadingPromise)
-    }
-    setCurrentSpeaker({ name: "", title: "" }) // Clear highlight after recording stops
-    transcriptRef.current = ""
-    lastPartialRef.current = ""
-    setLiveTranscript("")
   }
 
   const toggleRecording = () => {
@@ -914,115 +821,20 @@ export default function DebateSession({
     else startRecording()
   }
 
-  const handleUserResponse = async (
-    text: string,
-    audioPromise?: Promise<{
-      url: string | null
-      path: string | null
-    } | null>,
-  ) => {
-    const user = authSession?.user
-    const isUserPro = session?.userSide === "PRO"
-    const userMsg: Message = {
-      role: "user",
-      parts: [
-        {
-          type: "text",
-          text,
-          speakerName: user?.name || "You",
-          speakerTitle: isUserPro ? "Prime Minister" : "Leader of Opposition",
-          isUsersTurn: false,
-        },
-      ],
-    }
-    const newMessages: Message[] = [...messages, userMsg]
-    setSuggestedText("")
-    setMessages(newMessages)
-    setIsThinking(true)
-    setCurrentSpeaker({ name: "", title: "" }) // Clear highlight when user responds
-
-    // Fetch AI response immediately
-    const aiResponsePromise = fetchAiResponse(newMessages)
-
-    // Handle audio upload and patch in background
-    if (audioPromise) {
-      Promise.all([aiResponsePromise, audioPromise]).then(
-        async ([aiData, uploadResult]) => {
-          const result = uploadResult as {
-            url: string | null
-            path: string | null
-          } | null
-          if (aiData?.userMessageId && result?.url) {
-            try {
-              await fetch(`/api/messages/${aiData.userMessageId}`, {
-                method: "PATCH",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  audioUrl: result.url,
-                  audioPath: result.path,
-                }),
-              })
-            } catch (err) {
-              console.error("Failed to patch message audio:", err)
-            }
-          }
-        },
-      )
-    }
-
-    const aiData = await aiResponsePromise
-    if (aiData && aiData.text) {
-      const assistantMsg: Message = {
-        role: "assistant",
-        parts: [
-          {
-            type: "text" as const,
-            text: aiData.text,
-            speakerName: aiData.speakerName,
-            speakerTitle: aiData.speakerTitle,
-            isUsersTurn: !!aiData.isUsersTurn,
-            audio: { url: aiData.audioUrl, path: aiData.audioPath },
-          },
-          ...(aiData.toolCalls
-            ? aiData.toolCalls.map((tc: MessagePart) => ({
-                type: "tool" as const,
-                name: (tc.name || tc.tool?.name || "") as string,
-                parameters: (tc.parameters ||
-                  tc.tool?.parameters ||
-                  {}) as Record<string, unknown>,
-              }))
-            : []),
-        ],
-      }
-      setMessages([...newMessages, assistantMsg])
-      setCurrentSpeaker({
-        name: aiData.speakerName,
-        title: aiData.speakerTitle,
-      })
-
-      // Delay setting isUsersTurn until the speech ends
-      if (aiData.isUsersTurn) {
-        pendingTurnChangeRef.current = true
-      } else {
-        setIsUsersTurn(false)
-        pendingTurnChangeRef.current = null
-      }
-
-      if (aiData.toolCalls && Array.isArray(aiData.toolCalls)) {
-        handleToolCalls(aiData.toolCalls)
-      }
-
-      speak(
-        aiData.text,
-        aiData.status === "COMPLETED" || aiData.status === "Completed",
-        aiData.speakerName,
-        aiData.speakerTitle,
-        aiData.audioUrl,
-      )
-    } else {
-      setIsThinking(false)
-    }
+  const stopAndCancel = () => {
+    setIsRecording(false)
+    stopMicrophoneStreaming()
   }
+
+  // Sync refs with state
+  useEffect(() => {
+    isMutedRef.current = isMuted
+    isPausedRef.current = isPaused
+  }, [isMuted, isPaused])
+
+  useEffect(() => {
+    messagesRef.current = messages
+  }, [messages])
 
   useEffect(() => {
     return () => stopAll()
