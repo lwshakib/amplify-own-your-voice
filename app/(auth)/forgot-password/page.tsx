@@ -7,7 +7,7 @@
 
 import { ForgotPasswordForm } from "@/components/auth/forgot-password-form" // The form to handle password reset requests
 import { Logo } from "@/components/layout/logo" // The application logo
-import Image from "next/image" // Next.js optimized image component
+import { AuthVisual } from "@/components/auth/auth-visual"
 
 /**
  * ForgotPasswordPage Component
@@ -18,24 +18,10 @@ export default function ForgotPasswordPage() {
     /**
      * Grid Container
      * min-h-svh: Full viewport height
-     * lg:grid-cols-2: Two Column layout on desktop (Left: Image, Right: Form)
+     * lg:grid-cols-2: Two Column layout on desktop (Left: Form, Right: Visual Web)
      */
     <div className="grid min-h-svh lg:grid-cols-2 bg-background">
-      {/* Left Column (Desktop only) - Aesthetic Background */}
-      <div className="bg-muted relative hidden lg:block border-r border-white/5">
-        {/* Background Image reused from sign-up for consistency */}
-        <Image
-          src="/signup-bg.png"
-          alt="Password Recovery Background"
-          fill
-          className="absolute inset-0 h-full w-full object-cover dark:brightness-[0.4]"
-          priority
-        />
-        {/* Dark gradient overlay */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-      </div>
-
-      {/* Right Column (or full width on mobile) - Form Area */}
+      {/* Left Column (or full width on mobile) - Form Area */}
       <div className="flex flex-col gap-4 p-6 md:p-10">
         {/* Top area for the Logo */}
         <div className="flex justify-center gap-2 md:justify-start">
@@ -48,6 +34,11 @@ export default function ForgotPasswordPage() {
             <ForgotPasswordForm />
           </div>
         </div>
+      </div>
+
+      {/* Right Column (Desktop only) - Aesthetic Background */}
+      <div className="relative hidden lg:block border-l border-white/5">
+        <AuthVisual />
       </div>
     </div>
   )

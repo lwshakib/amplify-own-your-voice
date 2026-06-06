@@ -9,7 +9,7 @@ import { Suspense } from "react" // For handling asynchronous loading of the for
 import { ResetPasswordForm } from "@/components/auth/reset-password-form" // The form to set a new password
 import { Logo } from "@/components/layout/logo" // Application logo
 import { Loader2 } from "lucide-react" // Loading spinner icon
-import Image from "next/image" // Optimized image component
+import { AuthVisual } from "@/components/auth/auth-visual"
 
 /**
  * ResetPasswordPage Component
@@ -20,22 +20,10 @@ export default function ResetPasswordPage() {
     /**
      * Grid Container
      * min-h-svh: Full viewport height
-     * lg:grid-cols-2: Two Column layout on desktop (Left: Image, Right: FormArea)
+     * lg:grid-cols-2: Two Column layout on desktop (Left: FormArea, Right: Visual Web)
      */
     <div className="grid min-h-svh lg:grid-cols-2 bg-background">
-      {/* Left Column (Desktop only) - Aesthetic Background */}
-      <div className="bg-muted relative hidden lg:block border-r border-white/5">
-        <Image
-          src="/signup-bg.png"
-          alt="Reset Password Background"
-          fill
-          className="absolute inset-0 h-full w-full object-cover dark:brightness-[0.4]"
-          priority
-        />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-      </div>
-
-      {/* Right Column (or full width on mobile) - Form Area */}
+      {/* Left Column (or full width on mobile) - Form Area */}
       <div className="flex flex-col gap-4 p-6 md:p-10">
         {/* Top area for the Logo */}
         <div className="flex justify-center gap-2 md:justify-start">
@@ -61,6 +49,11 @@ export default function ResetPasswordPage() {
             </Suspense>
           </div>
         </div>
+      </div>
+
+      {/* Right Column (Desktop only) - Aesthetic Background */}
+      <div className="relative hidden lg:block border-l border-white/5">
+        <AuthVisual />
       </div>
     </div>
   )

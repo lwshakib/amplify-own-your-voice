@@ -6,7 +6,7 @@
 
 import { LoginForm } from "@/components/auth/login-form" // The actual authentication form logic
 import { Logo } from "@/components/layout/logo" // The application logo
-import Image from "next/image" // Next.js optimized image component
+import { AuthVisual } from "@/components/auth/auth-visual"
 
 /**
  * SignInPage Component
@@ -17,7 +17,7 @@ export default function SignInPage() {
     /**
      * Grid Container
      * min-h-svh: Full viewport height (Small Viewport Height)
-     * lg:grid-cols-2: Two Column layout on desktop (Left: Form, Right: Image)
+     * lg:grid-cols-2: Two Column layout on desktop (Left: Form, Right: Visual Web)
      */
     <div className="grid min-h-svh lg:grid-cols-2 bg-background">
       {/* Left Column (or full width on mobile) - Form Area */}
@@ -36,17 +36,8 @@ export default function SignInPage() {
       </div>
 
       {/* Right Column (Desktop only) - Aesthetic Background */}
-      <div className="bg-muted relative hidden lg:block border-l border-white/5">
-        {/* Background Image with optimized loading */}
-        <Image
-          src="/signin-bg.png"
-          alt="Sign In Background"
-          fill
-          className="absolute inset-0 h-full w-full object-cover dark:brightness-[0.4]"
-          priority
-        />
-        {/* Dark gradient overlay to improve contrast and aesthetic depth */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+      <div className="relative hidden lg:block border-l border-white/5">
+        <AuthVisual />
       </div>
     </div>
   )
