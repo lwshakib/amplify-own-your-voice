@@ -19,14 +19,14 @@ export default function AuthLayout({
      * This creates a unified dark background spanning the entire viewport.
      */
     <div className="dark grid min-h-svh lg:grid-cols-2 bg-zinc-950 text-white antialiased">
-      {/* Left Column - Dynamic Auth Forms (Sign In, Sign Up, etc.) */}
-      <div className="flex flex-col min-h-svh">
-        {children}
+      {/* Left Column (Desktop only) - Persistent Visual Soundwave */}
+      <div className="relative hidden lg:block bg-zinc-950">
+        <AuthVisual />
       </div>
 
-      {/* Right Column (Desktop only) - Persistent Visual Soundwave */}
-      <div className="relative hidden lg:block border-l border-zinc-900 bg-zinc-950">
-        <AuthVisual />
+      {/* Right Column - Dynamic Auth Forms (Sign In, Sign Up, etc.) */}
+      <div className="flex flex-col min-h-svh">
+        {children}
       </div>
     </div>
   )

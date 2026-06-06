@@ -5,7 +5,6 @@
  */
 
 import { VerifyEmailView } from "@/components/auth/verify-email-view" // Component that handles the verification logic and UI
-import { Logo } from "@/components/layout/logo" // Application logo
 
 /**
  * VerifyEmailPage Component
@@ -13,14 +12,9 @@ import { Logo } from "@/components/layout/logo" // Application logo
  */
 export default function VerifyEmailPage() {
   return (
-    <div className="flex flex-col flex-1 gap-4 p-6 md:p-10">
-      {/* Top area for the Logo */}
-      <div className="flex justify-center gap-2 md:justify-start">
-        <Logo />
-      </div>
-
+    <div className="flex flex-col flex-1 gap-4 p-6 md:p-10 justify-center">
       {/* Centered container for the verification view */}
-      <div className="flex flex-1 items-center justify-center">
+      <div className="flex items-center justify-center">
         <div className="w-full max-w-md">
           <VerifyEmailView />
         </div>

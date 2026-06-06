@@ -5,7 +5,6 @@
  */
 
 import { ForgotPasswordForm } from "@/components/auth/forgot-password-form" // The form to handle password reset requests
-import { Logo } from "@/components/layout/logo" // The application logo
 
 /**
  * ForgotPasswordPage Component
@@ -13,14 +12,9 @@ import { Logo } from "@/components/layout/logo" // The application logo
  */
 export default function ForgotPasswordPage() {
   return (
-    <div className="flex flex-col flex-1 gap-4 p-6 md:p-10">
-      {/* Top area for the Logo */}
-      <div className="flex justify-center gap-2 md:justify-start">
-        <Logo />
-      </div>
-
+    <div className="flex flex-col flex-1 gap-4 p-6 md:p-10 justify-center">
       {/* Centered container for the forgot password form */}
-      <div className="flex flex-1 items-center justify-center">
+      <div className="flex items-center justify-center">
         <div className="w-full max-w-md">
           <ForgotPasswordForm />
         </div>

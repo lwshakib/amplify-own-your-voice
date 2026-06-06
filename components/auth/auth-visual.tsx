@@ -1,6 +1,8 @@
 "use client"
 
 import { motion } from "framer-motion"
+import { Logo } from "@/components/layout/logo"
+import { IconSparkles, IconActivity, IconLock, IconMessageChatbot, IconVolume } from "@tabler/icons-react"
 
 export function AuthVisual() {
   // 17 bars for a minimal soundwave visualizer
@@ -13,12 +15,9 @@ export function AuthVisual() {
         <div className="h-[300px] w-[300px] rounded-full bg-primary/5 blur-[80px]" />
       </div>
 
-      {/* Top Brand Name */}
-      <div className="relative z-10 flex items-center gap-1.5">
-        <div className="h-1.5 w-1.5 rounded-full bg-primary/50 animate-pulse" />
-        <span className="text-[10px] font-medium tracking-widest text-zinc-500 uppercase">
-          Voice Platform
-        </span>
+      {/* Top Brand Logo */}
+      <div className="relative z-10">
+        <Logo />
       </div>
 
       {/* Center - Minimal Soundwave Visualization */}
