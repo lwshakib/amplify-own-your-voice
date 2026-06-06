@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { aiService } from "@/services/ai.services"
+import { generateObject } from "@/llm/generateObject"
 import { z } from "zod"
 
 const SolutionSchema = z.object({
@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
 
     Return ONLY the solution and explanation in the specified JSON format.`
 
-    const result = await aiService.generateObject({
+    const result = await generateObject({
       messages: [
         { role: "system", content: systemPrompt },
         {
