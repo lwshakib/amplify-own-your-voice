@@ -7,7 +7,7 @@
 
 "use client"
 
-import { useState } from "react"
+import { useState, useRef, useEffect } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { IconArrowLeft, IconSparkles } from "@tabler/icons-react"
@@ -40,13 +40,20 @@ export default function CreateInterviewPage() {
   const [type, setType] = useState<string>("GENERAL")
   const [characterId, setCharacterId] = useState<string>("orpheus") // Default interviewer
 
-  // Ref for stopping AI generation prematurely
-  const [abortController, setAbortController] =
-    useState<AbortController | null>(null)
+  const eventSourceRef = useRef<EventSource | null>(null)
+
+  // Clean up connection on component unmount to prevent leaks
+  useEffect(() => {
+    return () => {
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close()
+      }
+    }
+  }, [])
 
   /**
    * AI Job Description Generation
-   * Streams a generated job description from the backend based on the title and type.
+   * Streams a generated job description from the backend using Server-Sent Events (SSE).
    */
   const handleGenerateDescription = async () => {
     if (!jobTitle.trim()) {
@@ -54,71 +61,66 @@ export default function CreateInterviewPage() {
       return
     }
 
-    const controller = new AbortController()
-    setAbortController(controller)
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close()
+    }
+
     setIsGenerating(true)
-    setDescription("") // Reset buffer before starting
+    setDescription("") // Reset text buffer
 
-    try {
-      const response = await fetch("/api/generate-job-description", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ jobTitle, type }),
-        signal: controller.signal, // Pass signal to allow cancellation
-      })
+    const params = new URLSearchParams({
+      jobTitle,
+      type,
+    })
 
-      if (!response.ok) throw new Error("Failed to generate")
+    const eventSource = new EventSource(`/api/generate-job-description?${params.toString()}`)
+    eventSourceRef.current = eventSource
 
-      const reader = response.body?.getReader()
-      const decoder = new TextDecoder()
+    eventSource.onopen = () => {
+      console.log("SSE Connection opened")
+    }
 
-      if (!reader) return
+    eventSource.onmessage = (event) => {
+      if (event.data === "[DONE]") {
+        eventSource.close()
+        eventSourceRef.current = null
+        setIsGenerating(false)
+        return
+      }
 
-      let buffer = ""
-      // Read the stream chunk-by-chunk for a smooth 'typing' effect
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
-
-        buffer += decoder.decode(value, { stream: true })
-        const lines = buffer.split("\n")
-        buffer = lines.pop() || ""
-
-        for (const line of lines) {
-          const trimmed = line.trim()
-          if (!trimmed) continue
-          if (trimmed.startsWith("data: ")) {
-            const dataStr = trimmed.slice(6)
-            try {
-              const parsed = JSON.parse(dataStr)
-              if (parsed.type === "text" && parsed.content) {
-                console.log("Job description chunk:", parsed.content)
-                setDescription((prev) => prev + parsed.content)
-              }
-            } catch (err) {
-              // Ignore partial or malformed lines during streaming
-            }
-          }
+      try {
+        const parsed = JSON.parse(event.data)
+        if (parsed.type === "text" && parsed.content) {
+          setDescription((prev) => prev + parsed.content)
         }
+      } catch (err) {
+        console.error("Failed to parse event data packet:", err)
       }
-    } catch (error) {
-      if (error instanceof Error && error.name === "AbortError") {
-        toast.info("Generation cancelled")
+    }
+
+    eventSource.onerror = () => {
+      if (eventSource.readyState === EventSource.CLOSED) {
+        setIsGenerating(false)
+        eventSourceRef.current = null
       } else {
-        console.error("Stream error:", error)
         toast.error("Failed to generate job description. Please try again.")
+        eventSource.close()
+        eventSourceRef.current = null
+        setIsGenerating(false)
       }
-    } finally {
-      setIsGenerating(false)
-      setAbortController(null)
     }
   }
 
   /**
-   * Aborts the active fetch stream.
+   * Aborts the active EventSource stream.
    */
   const handleAbortGeneration = () => {
-    if (abortController) abortController.abort()
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close()
+      eventSourceRef.current = null
+      setIsGenerating(false)
+      toast.info("Generation cancelled")
+    }
   }
 
   /**
